@@ -60,7 +60,7 @@
   function fresh() {
     const seed = clone(window.SUR_SEED || { collections: [], stutis: [] });
     return {
-      v: 1, collections: seed.collections, stutis: seed.stutis, customStutis: [], path: [], pos: null,
+      v: 1, collections: seed.collections, stutis: seed.stutis, customStutis: [], deletedSeedIds: [], path: [], pos: null,
       settings: { view: 'both', size: 24, theme: 'dark', style: 'standard' }
     };
   }
@@ -76,6 +76,11 @@
         // Remove old authorName from settings for backwards compatibility
         if (d.settings.authorName) delete d.settings.authorName;
         d.customStutis = Array.isArray(d.customStutis) ? d.customStutis : [];
+        d.deletedSeedIds = Array.isArray(d.deletedSeedIds) ? d.deletedSeedIds : [];
+        // Filter out deleted seed stutis
+        if (d.deletedSeedIds.length > 0) {
+          d.stutis = d.stutis.filter(s => !d.deletedSeedIds.includes(s.id));
+        }
         return d;
       }
     } catch (e) {}
@@ -499,6 +504,8 @@
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
       const isCustom = S.customStutis.some(s => s.id === x.id);
+      const isFromCloud = x.collectionId === 'cloud-collection';
+      const canDelete = isCustom || (window.SUR_SEED?.stutis?.some(s => s.id === x.id));
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
@@ -509,10 +516,19 @@
         h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } })
       ];
       
-      if (isCustom) {
+      if (canDelete && !isFromCloud) {
         buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
           if (confirm('Delete this stuti? This cannot be undone.')) {
-            S.customStutis = S.customStutis.filter(s => s.id !== x.id);
+            const isSeed = window.SUR_SEED?.stutis?.some(s => s.id === x.id);
+            
+            if (isCustom) {
+              S.customStutis = S.customStutis.filter(s => s.id !== x.id);
+            }
+            
+            if (isSeed) {
+              S.deletedSeedIds.push(x.id);
+            }
+            
             S.stutis = S.stutis.filter(s => s.id !== x.id);
             S.path = S.path.filter(st => st.id !== x.id);
             saveLocal();
