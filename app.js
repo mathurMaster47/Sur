@@ -1,7 +1,5 @@
 /* Sur – सुर
- * Build your own sequence of stutis and aartis, read them page by page,
- * and sing along with English-letter transliteration.
- * Public Cloud version: synced globally via Supabase, no login required.
+ * Public & Private Cloud Edition with Share Links and Author Names.
  */
 (function () {
   'use strict';
@@ -22,7 +20,6 @@
   const OCR = { hi: 'hin', sa: 'san', mr: 'mar', gu: 'guj', pa: 'pan', ne: 'nep', bn: 'ben', as: 'asm', or: 'ori', raj: 'hin', bho: 'hin', mai: 'hin' };
   const RULES = { raj: 'hi', bho: 'hi', mai: 'hi' };
   const CATEGORIES = [['stuti', 'Stuti'], ['aarti', 'Aarti'], ['chalisa', 'Chalisa'], ['bhajan', 'Bhajan'], ['mantra', 'Mantra'], ['other', 'Other']];
-  const DEITIES = ['Ganesh', 'Durga', 'Lakshmi', 'Saraswati', 'Hanuman', 'Shiva', 'Vishnu', 'Krishna', 'Ram', 'Ambe Maa', 'Kali', 'Santoshi Maa'];
 
   /* ---------- helpers ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -59,88 +56,130 @@
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2400);
   }
 
-  /* ---------- state & cloud sync ---------- */
+  /* ---------- state ---------- */
   function fresh() {
-    const seed = clone(window.SUR_SEED);
+    const seed = clone(window.SUR_SEED || { collections: [], stutis: [] });
     return {
-      v: 1, collections: seed.collections, stutis: seed.stutis, path: [], pos: null,
-      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard' }
+      v: 1, collections: seed.collections, stutis: seed.stutis, customStutis: [], path: [], pos: null,
+      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard', authorName: 'Ansh' }
     };
   }
 
-  let S = load();
-  function load() {
+  let S = loadLocal();
+
+  function loadLocal() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw);
-        if (d && d.v === 1 && Array.isArray(d.collections) && Array.isArray(d.stutis)) {
-          d.settings = Object.assign(fresh().settings, d.settings || {});
-          d.path = Array.isArray(d.path) ? d.path : [];
-          return d;
-        }
+        d.settings = Object.assign(fresh().settings, d.settings || {});
+        d.customStutis = Array.isArray(d.customStutis) ? d.customStutis : [];
+        return d;
       }
     } catch (e) {}
     return fresh();
   }
 
-  function save() {
+  function saveLocal() {
     try { localStorage.setItem(KEY, JSON.stringify(S)); }
-    catch (e) { toast('Could not save locally.'); }
+    catch (e) {}
+  }
+
+  /* ---------- cloud & share handling ---------- */
+  async function fetchCloudStutis() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient.from('stutis').select('*');
+    if (!error && data) {
+      const cloudStutis = data.map(row => ({
+        id: row.id,
+        title: row.title,
+        deity: row.deity || '',
+        category: row.category || 'stuti',
+        lang: row.language || 'hi',
+        authorName: row.author_name || 'Anonymous',
+        collectionId: 'cloud-collection',
+        pages: row.pages || [],
+        isPublic: true
+      }));
+
+      if (!S.collections.some(c => c.id === 'cloud-collection')) {
+        S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
+      }
+
+      const map = new Map();
+      (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
+      S.customStutis.forEach(s => map.set(s.id, s));
+      cloudStutis.forEach(s => map.set(s.id, s));
+
+      S.stutis = Array.from(map.values());
+      cleanPath();
+      route();
+    }
   }
 
   async function initCloud() {
     try {
       const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
       supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      
-      // Fetch public stutis from Supabase cloud
-      const { data, error } = await supabaseClient.from('stutis').select('*');
-      if (!error && data && data.length > 0) {
-        // Map cloud database columns to app format
-        const cloudStutis = data.map(row => ({
-          id: row.id,
-          title: row.title,
-          deity: row.deity || '',
-          category: row.category || 'stuti',
-          lang: row.language || 'hi',
-          collectionId: 'cloud-collection',
-          pages: row.pages || []
-        }));
 
-        // Ensure cloud collection exists
-        if (!S.collections.some(c => c.id === 'cloud-collection')) {
-          S.collections.push({ id: 'cloud-collection', name: 'Cloud Community', builtin: false });
-        }
+      await fetchCloudStutis();
 
-        // Merge cloud stutis with seed stutis
-        const seedStutis = clone(window.SUR_SEED).stutis;
-        const map = new Map();
-        seedStutis.forEach(s => map.set(s.id, s));
-        cloudStutis.forEach(s => map.set(s.id, s));
-        S.stutis = Array.from(map.values());
-        save();
-        route();
-      }
+      // Check URL for imported stuti share link
+      checkImportLink();
+
+      supabaseClient
+        .channel('public:stutis')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stutis' }, () => {
+          fetchCloudStutis();
+        })
+        .subscribe();
+
     } catch (e) {
-      console.error('Cloud sync offline:', e);
+      console.error('Cloud connection error:', e);
     }
   }
 
   async function saveToCloud(rec) {
     if (!supabaseClient) return;
     try {
-      await supabaseClient.from('stutis').upsert({
+      const { error } = await supabaseClient.from('stutis').upsert({
         id: rec.id,
         title: rec.title,
         category: rec.category,
         deity: rec.deity,
         language: rec.lang,
+        author_name: rec.authorName || 'Anonymous',
         pages: rec.pages
       });
+      if (error) toast('Cloud save error: ' + error.message);
     } catch (e) {
-      console.error('Error saving to cloud:', e);
+      console.error('Save to cloud failed:', e);
     }
+  }
+
+  function checkImportLink() {
+    const params = new URLSearchParams(window.location.search);
+    const sharedData = params.get('share');
+    if (sharedData) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+        if (decoded && decoded.title && decoded.pages) {
+          if (!S.customStutis.some(s => s.id === decoded.id)) {
+            S.customStutis.push(decoded);
+            S.stutis.push(decoded);
+            saveLocal();
+            toast(`Imported "${decoded.title}" into your library! `);
+          }
+        }
+      } catch (e) {
+        console.error('Invalid share link:', e);
+      }
+    }
+  }
+
+  function generateShareLink(stuti) {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(stuti))));
+    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/";
   }
 
   function cleanPath() {
@@ -148,7 +187,6 @@
       ? S.collections.some((c) => c.id === st.id)
       : S.stutis.some((x) => x.id === st.id));
   }
-  cleanPath();
 
   const colOf = (id) => S.collections.find((c) => c.id === id);
   const stutiOf = (id) => S.stutis.find((x) => x.id === id);
@@ -214,7 +252,7 @@
     app.append(h('div', { class: 'screen' },
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
-        h('p', { class: 'muted', text: 'Your prayers, in your order. Public Cloud Edition.' })),
+        h('p', { class: 'muted', text: 'Your prayers, in your order.' })),
       h('section', { class: 'card' },
         h('h2', { text: 'Your Sur' }),
         h('ol', { class: 'steps' }, S.path.map((st) => {
@@ -238,7 +276,7 @@
       seqBox.replaceChildren(h('h2', { text: 'Your sequence' }));
       cleanPath();
       if (!S.path.length) {
-        seqBox.append(h('p', { class: 'muted', text: 'Nothing yet. Add collections or single stutis from the list below.' }));
+        seqBox.append(h('p', { class: 'muted', text: 'Nothing yet. Add items below.' }));
       } else {
         const ol = h('ol', { class: 'steps' });
         S.path.forEach((st, i) => {
@@ -248,24 +286,24 @@
             h('div', { class: 'name' }, h('b', { text: info.name }), h('span', { class: 'muted', text: info.sub })),
             h('button', { class: 'btn small', type: 'button', text: '▲', disabled: i === 0, onclick: () => move(i, -1) }),
             h('button', { class: 'btn small', type: 'button', text: '▼', disabled: i === S.path.length - 1, onclick: () => move(i, 1) }),
-            h('button', { class: 'btn small danger', type: 'button', text: '✕', onclick: () => { S.path.splice(i, 1); save(); redraw(); } })));
+            h('button', { class: 'btn small danger', type: 'button', text: '✕', onclick: () => { S.path.splice(i, 1); saveLocal(); redraw(); } })));
         });
         seqBox.append(ol);
       }
       startRow.replaceChildren(
-        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, 'aria-disabled': S.path.length ? null : 'true', text: 'Start', onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast('Add something first'); } } }),
+        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, text: 'Start', onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast('Add something first'); } } }),
         S.path.length ? link('Done', '#/', 'ghost') : null);
     }
     function move(i, d) {
       const j = i + d;
       if (j < 0 || j >= S.path.length) return;
       [S.path[i], S.path[j]] = [S.path[j], S.path[i]];
-      save(); redraw();
+      saveLocal(); redraw();
     }
-    function addStep(type, id) { S.path.push({ type, id }); save(); redraw(); }
+    function addStep(type, id) { S.path.push({ type, id }); saveLocal(); redraw(); }
     function renderAdd() {
       addBox.replaceChildren(h('h2', { text: 'Add to your sequence' }),
-        h('p', { class: 'muted', text: 'Add a whole collection, or pick single stutis.' }));
+        h('p', { class: 'muted', text: 'Pick from whole collections or single stutis.' }));
       S.collections.forEach((c) => {
         const items = stutisIn(c.id);
         addBox.append(h('details', null,
@@ -290,7 +328,6 @@
     app.append(h('div', { class: 'screen' },
       welcome ? h('div', { class: 'hero' }, h('div', { class: 'logo', text: 'सुर' })) : null,
       h('h1', { text: welcome ? 'Build your Sur' : 'Edit your Sur' }),
-      h('p', { class: 'muted', text: 'Choose what you want to recite and in what order.' }),
       seqBox, startRow, addBox));
     renderSeq(); renderAdd();
   }
@@ -300,16 +337,11 @@
     const single = params.get('s');
     const queue = single ? [stutiOf(single)].filter(Boolean) : buildQueue();
     if (!queue.length) {
-      app.append(h('div', { class: 'screen' }, h('h1', { text: 'Nothing to read yet' }),
-        h('p', { class: 'muted', text: 'Build your sequence first.' }), link('Build your Sur', '#/path', 'primary')));
+      app.append(h('div', { class: 'screen' }, h('h1', { text: 'Nothing to read yet' }), link('Build your Sur', '#/path', 'primary')));
       return;
     }
     document.body.classList.add('reading');
-    let qi = 0, pi = 0, done = false, editing = false;
-    if (params.get('resume') && S.pos) {
-      const i = queue.findIndex((x) => x.id === S.pos.sid);
-      if (i >= 0) { qi = i; pi = Math.min(S.pos.page || 0, queue[i].pages.length - 1); }
-    }
+    let qi = 0, pi = 0, done = false;
     const total = queue.reduce((a, s) => a + s.pages.length, 0);
 
     const titleEl = h('div', { class: 'ttl' });
@@ -323,9 +355,9 @@
 
     function renderSeg() {
       viewSeg.replaceChildren(...[['orig', 'Original'], ['roman', 'English'], ['both', 'Both']].map(([k, l]) =>
-        h('button', { type: 'button', class: S.settings.view === k ? 'on' : '', text: l, onclick: () => { S.settings.view = k; save(); renderSeg(); draw(); } })));
+        h('button', { type: 'button', class: S.settings.view === k ? 'on' : '', text: l, onclick: () => { S.settings.view = k; saveLocal(); renderSeg(); draw(); } })));
     }
-    const setSize = (d) => { S.settings.size = Math.max(14, Math.min(48, S.settings.size + d)); save(); draw(); };
+    const setSize = (d) => { S.settings.size = Math.max(14, Math.min(48, S.settings.size + d)); saveLocal(); draw(); };
 
     const topbar = h('div', { class: 'topbar' },
       h('div', { class: 'row between' },
@@ -334,12 +366,11 @@
           h('button', { class: 'btn small', type: 'button', text: 'A−', onclick: () => setSize(-2) }),
           h('button', { class: 'btn small', type: 'button', text: 'A+', onclick: () => setSize(2) }),
           h('button', { class: 'btn small', type: 'button', text: S.settings.theme === 'dark' ? '☀' : '☾',
-            onclick: (e) => { S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); e.currentTarget.textContent = S.settings.theme === 'dark' ? '☀' : '☾'; }
+            onclick: (e) => { S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; saveLocal(); applyTheme(); e.currentTarget.textContent = S.settings.theme === 'dark' ? '☀' : '☾'; }
           }))),
       h('div', { style: 'margin-top:8px' }, titleEl, subEl),
       h('div', { class: 'progress' }, fill),
-      h('div', { class: 'tools' }, viewSeg,
-        h('button', { class: 'btn small', type: 'button', text: 'Edit English', onclick: () => { if (!done) { editing = !editing; draw(); } } })));
+      h('div', { class: 'tools' }, viewSeg));
     const bottom = h('div', { class: 'bottombar' }, prevBtn, pageLabel, nextBtn);
     app.append(h('div', { class: 'reader' }, topbar, stage, bottom));
 
@@ -356,21 +387,11 @@
       else { o.forEach((l) => box.append(line(l, 'o'))); box.append(h('div', { class: 'gap' })); r.forEach((l) => box.append(line(l, 'r'))); }
       return box;
     }
-    function editor(st, pg) {
-      const ta = h('textarea', { rows: 10, style: 'font-size:1rem' });
-      ta.value = romanOf(st, pg);
-      return h('div', null,
-        h('p', { class: 'muted', text: 'Fix the English letters for this page.' }), ta,
-        h('div', { class: 'row', style: 'margin-top:10px' },
-          btn('Save', () => { pg.translit = ta.value.trim() ? ta.value : null; st.updated = Date.now(); save(); saveToCloud(st); editing = false; draw(); toast('Saved to cloud'); }, 'primary'),
-          btn('Reset', () => { pg.translit = null; save(); saveToCloud(st); editing = false; draw(); }),
-          btn('Cancel', () => { editing = false; draw(); }, 'ghost')));
-    }
+
     function draw() {
       stage.replaceChildren();
       if (done) {
         stage.append(h('div', { class: 'done' }, h('h2', { text: 'Completed ' }),
-          h('p', { class: 'muted', text: 'You reached the end.' }),
           h('div', { class: 'row', style: 'justify-content:center' },
             btn('Start again', () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'), link('Home', '#/', 'ghost'))));
         fill.style.width = '100%'; titleEl.textContent = 'Completed'; subEl.textContent = '';
@@ -387,9 +408,7 @@
       prevBtn.disabled = qi === 0 && pi === 0;
       nextBtn.disabled = false;
       nextBtn.textContent = (qi === queue.length - 1 && pi === st.pages.length - 1) ? 'Finish ✓' : 'Next ▶';
-      stage.append(editing ? editor(st, pg) : pageContent(st, pg));
-      S.pos = { sid: st.id, page: pi };
-      save();
+      stage.append(pageContent(st, pg));
     }
     function next() {
       if (done) return;
@@ -397,37 +416,14 @@
       if (pi < st.pages.length - 1) pi++;
       else if (qi < queue.length - 1) { qi++; pi = 0; }
       else done = true;
-      editing = false; draw(); window.scrollTo(0, 0);
+      draw(); window.scrollTo(0, 0);
     }
     function prev() {
       if (done) done = false;
       else if (pi > 0) pi--;
       else if (qi > 0) { qi--; pi = queue[qi].pages.length - 1; }
-      editing = false; draw(); window.scrollTo(0, 0);
+      draw(); window.scrollTo(0, 0);
     }
-
-    const onKey = (e) => {
-      if (/^(TEXTAREA|INPUT|SELECT)$/.test((e.target.tagName || ''))) return;
-      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
-      else if (e.key === 'ArrowLeft') prev();
-    };
-    document.addEventListener('keydown', onKey);
-    cleanups.push(() => document.removeEventListener('keydown', onKey));
-    let tx = null, ty = null;
-    stage.addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
-    stage.addEventListener('touchend', (e) => {
-      if (tx == null || editing) return;
-      const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
-      tx = null;
-      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) { dx < 0 ? next() : prev(); }
-    }, { passive: true });
-
-    let lock = null;
-    const getLock = async () => { try { if ('wakeLock' in navigator) lock = await navigator.wakeLock.request('screen'); } catch (e) {} };
-    const onVis = () => { if (document.visibilityState === 'visible') getLock(); };
-    getLock();
-    document.addEventListener('visibilitychange', onVis);
-    cleanups.push(() => { document.removeEventListener('visibilitychange', onVis); try { lock && lock.release(); } catch (e) {} });
 
     renderSeg(); draw();
   }
@@ -437,12 +433,17 @@
     const q = h('input', { type: 'search', placeholder: 'Search title, deity or text…' });
     const list = h('div');
     function row(x) {
+      const shareUrl = generateShareLink(x);
       return h('div', { class: 'item' },
-        h('div', { class: 'name' }, h('b', { text: x.title }),
-          h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.pages.length} page${x.pages.length > 1 ? 's' : ''}${x.deity ? ' · ' + x.deity : ''}` })),
+        h('div', { class: 'name' }, 
+          h('b', { text: x.title }),
+          h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.authorName ? 'By ' + x.authorName + ' · ' : ''}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
-        h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); save(); toast('Added to your Sur'); } }),
-        link('Edit', '#/edit/' + encodeURIComponent(x.id), 'small ghost'));
+        h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
+          navigator.clipboard.writeText(shareUrl);
+          toast('Share link copied to clipboard!');
+        }}),
+        h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } }));
     }
     function draw() {
       const term = q.value.trim().toLowerCase();
@@ -454,7 +455,7 @@
         list.append(h('section', { class: 'card' },
           h('div', { class: 'row between' }, h('h3', { text: c.name }),
             term ? null : h('button', { class: 'btn small', type: 'button', text: '+ Whole collection', disabled: !items.length,
-              onclick: () => { S.path.push({ type: 'collection', id: c.id }); save(); toast('Added to your Sur'); } })),
+              onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast('Added to your Sur'); } })),
           items.length ? items.map(row) : h('p', { class: 'muted', text: 'No stutis yet.' })));
       });
       if (!list.children.length) list.append(h('p', { class: 'muted', text: 'No matches.' }));
@@ -467,189 +468,113 @@
   }
 
   /* ---------- Add / edit ---------- */
-  let tesseractPromise = null;
-  function loadTesseract() {
-    if (window.Tesseract) return Promise.resolve(window.Tesseract);
-    if (!tesseractPromise) {
-      tesseractPromise = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-        s.onload = () => resolve(window.Tesseract);
-        s.onerror = () => { tesseractPromise = null; reject(new Error('Could not load text-reading engine.')); };
-        document.head.append(s);
-      });
-    }
-    return tesseractPromise;
-  }
-  async function ocr(file, lang, onProgress) {
-    const T = await loadTesseract();
-    const r = await T.recognize(file, OCR[lang] || 'hin', {
-      logger: (m) => { if (m.status === 'recognizing text' && onProgress) onProgress(m.progress); }
-    });
-    return r.data.text;
-  }
-
   function viewEdit(app, id) {
     const existing = id ? stutiOf(id) : null;
-    if (id && !existing) {
-      app.append(h('div', { class: 'screen' }, h('h1', { text: 'Not found' }), link('Back to library', '#/library')));
-      return;
-    }
     const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
     const d = existing ? clone(existing)
-      : { title: '', deity: '', category: 'stuti', lang: 'hi', collectionId: mine.id, pages: [{ text: '', translit: null }] };
+      : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: S.settings.authorName || 'Ansh', collectionId: mine.id, pages: [{ text: '', translit: null }] };
 
     const pagesBox = h('div');
-    const refreshers = [];
-
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
-    const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; refreshers.forEach((f) => f()); } },
+    const authorIn = h('input', { type: 'text', placeholder: 'Your Name (Publisher)', value: d.authorName, oninput: (e) => { d.authorName = e.target.value; S.settings.authorName = e.target.value; saveLocal(); } });
+    
+    const privacySel = h('select', {
+      onchange: (e) => { 
+        d.isPrivate = e.target.value === 'private';
+        authorIn.style.display = d.isPrivate ? 'none' : 'block';
+      }
+    },
+      h('option', { value: 'public', selected: !d.isPrivate, text: ' Public (Publish to Cloud for everyone)' }),
+      h('option', { value: 'private', selected: d.isPrivate, text: ' Private (Keep on this device only)' })
+    );
+
+    const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
-    const catSel = h('select', { onchange: (e) => { d.category = e.target.value; } },
-      CATEGORIES.map(([c, n]) => h('option', { value: c, selected: c === d.category, text: n })));
-    const deityIn = h('input', { type: 'text', list: 'deities', placeholder: 'e.g. Durga', value: d.deity, oninput: (e) => { d.deity = e.target.value; } });
-    const newColIn = h('input', { type: 'text', placeholder: 'Name of the new collection', style: 'display:none;margin-top:8px' });
-    const colSel = h('select', {
-      onchange: (e) => { d.collectionId = e.target.value; newColIn.style.display = e.target.value === '__new' ? 'block' : 'none'; }
-    }, S.collections.map((c) => h('option', { value: c.id, selected: c.id === d.collectionId, text: c.name })),
-      h('option', { value: '__new', text: '+ New collection…' }));
 
     function renderPages() {
-      refreshers.length = 0;
       pagesBox.replaceChildren();
       d.pages.forEach((pg, i) => {
-        const ta = h('textarea', { rows: 8, placeholder: 'Type or paste this page…' });
+        const ta = h('textarea', { rows: 8, placeholder: 'Type page content…' });
         ta.value = pg.text;
-        const prev = h('div', { class: 'preview muted' });
-        const romanTa = h('textarea', { rows: 5 });
-        const upd = () => {
-          const r = pg.text.trim() ? (pg.translit || autoRoman(pg.text, d.lang)) : '';
-          prev.textContent = r;
-          if (!pg.translit) romanTa.value = r;
-        };
-        refreshers.push(upd);
-        ta.addEventListener('input', () => { pg.text = ta.value; pg.translit = null; upd(); });
-        romanTa.addEventListener('input', () => { pg.translit = romanTa.value.trim() ? romanTa.value : null; prev.textContent = romanTa.value; });
-        const mv = (dir) => { const j = i + dir; if (j < 0 || j >= d.pages.length) return; [d.pages[i], d.pages[j]] = [d.pages[j], d.pages[i]]; renderPages(); };
-        pagesBox.append(h('div', { class: 'page-card' },
-          h('div', { class: 'row between' }, h('b', { text: `Page ${i + 1}` }),
-            h('div', { class: 'row' },
-              h('button', { class: 'btn small', type: 'button', text: '▲', disabled: i === 0, onclick: () => mv(-1) }),
-              h('button', { class: 'btn small', type: 'button', text: '▼', disabled: i === d.pages.length - 1, onclick: () => mv(1) }),
-              h('button', { class: 'btn small danger', type: 'button', text: 'Remove', disabled: d.pages.length === 1, onclick: () => { d.pages.splice(i, 1); renderPages(); } }))),
-          ta, prev,
-          h('details', null, h('summary', null, h('span', { class: 't muted', text: 'Edit English letters for this page' })), romanTa)));
-        upd();
+        ta.addEventListener('input', () => { pg.text = ta.value; });
+        pagesBox.append(h('div', { class: 'page-card' }, h('b', { text: `Page ${i + 1}` }), ta));
       });
     }
-    function addPages(texts) {
-      const clean = texts.map((t) => t.replace(/\s+$/, '')).filter((t) => t.trim());
-      if (!clean.length) return;
-      if (d.pages.length === 1 && !d.pages[0].text.trim()) d.pages = [];
-      clean.forEach((t) => d.pages.push({ text: t, translit: null }));
-      renderPages();
-    }
 
-    const splitTa = h('textarea', { rows: 6, placeholder: 'Paste the whole stuti here…' });
-    const splitMode = h('select', null,
-      h('option', { value: 'blank', text: 'Split at blank lines' }),
-      h('option', { value: 'n', text: 'Split every N lines' }));
-    const splitN = h('input', { type: 'number', min: 2, max: 60, value: 12, style: 'max-width:90px' });
-    const splitTool = h('details', null, h('summary', null, h('span', { class: 't', text: 'Paste a long stuti and split it into pages' })),
-      splitTa,
-      h('div', { class: 'row', style: 'margin-top:8px' }, splitMode, splitN,
-        btn('Split into pages', () => {
-          const text = splitTa.value.replace(/\r/g, '').trim();
-          if (!text) return;
-          let parts;
-          if (splitMode.value === 'blank') parts = text.split(/\n\s*\n+/);
-          else {
-            const n = Math.max(2, parseInt(splitN.value, 10) || 12), ls = text.split('\n');
-            parts = [];
-            for (let i = 0; i < ls.length; i += n) parts.push(ls.slice(i, i + n).join('\n'));
-          }
-          addPages(parts); splitTa.value = ''; toast(`Added ${parts.length} page(s)`);
-        })));
-
-    const photoIn = h('input', { type: 'file', accept: 'image/*', multiple: true });
-    const photoStatus = h('p', { class: 'muted' });
-    photoIn.addEventListener('change', async () => {
-      const files = [...photoIn.files];
-      if (!files.length) return;
-      for (let k = 0; k < files.length; k++) {
-        const label = `Reading photo ${k + 1} of ${files.length}`;
-        try {
-          photoStatus.textContent = label + '…';
-          const text = await ocr(files[k], d.lang, (p) => { photoStatus.textContent = `${label}… ${Math.round(p * 100)}%`; });
-          addPages([text.trim()]);
-        } catch (e) {
-          photoStatus.textContent = 'Could not read the photo: ' + (e && e.message ? e.message : e);
-          return;
-        }
-      }
-      photoStatus.textContent = 'Done.';
-      photoIn.value = '';
-    });
-    const photoTool = h('details', null, h('summary', null, h('span', { class: 't', text: 'Add pages from a photo' })), photoIn, photoStatus);
-
-    const saveBtn = btn(existing ? 'Save changes' : 'Save stuti', async () => {
+    const saveBtn = btn(existing ? 'Save changes' : 'Save Stuti', async () => {
       const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit || null }));
       if (!d.title.trim()) return toast('Please add a title');
       if (!pages.length) return toast('Add at least one page');
-      let cid = d.collectionId;
-      if (cid === '__new') {
-        const name = newColIn.value.trim();
-        if (!name) return toast('Name the new collection');
-        const c = { id: uid(), name, builtin: false };
-        S.collections.push(c); cid = c.id;
+
+      const rec = { 
+        id: d.id, 
+        title: d.title.trim(), 
+        deity: (d.deity || '').trim(), 
+        category: d.category, 
+        lang: d.lang, 
+        authorName: d.isPrivate ? 'Local User' : (d.authorName.trim() || 'Ansh'),
+        collectionId: d.isPrivate ? mine.id : 'cloud-collection', 
+        pages, 
+        isPrivate: d.isPrivate,
+        updated: Date.now() 
+      };
+
+      if (d.isPrivate) {
+        S.customStutis.push(rec);
+        S.stutis.push(rec);
+        saveLocal();
+        toast('Saved privately on this device!');
+      } else {
+        await saveToCloud(rec);
+        await fetchCloudStutis();
+        toast(`Published to Cloud by ${rec.authorName}!`);
       }
-      const rec = { id: existing ? existing.id : uid(), title: d.title.trim(), deity: (d.deity || '').trim(), category: d.category, lang: d.lang, collectionId: cid, pages, updated: Date.now() };
-      if (existing) S.stutis[S.stutis.indexOf(existing)] = rec; else S.stutis.push(rec);
-      save();
-      await saveToCloud(rec);
-      toast('Saved & synced to cloud!');
+
+      // Generate share link
+      const shareUrl = generateShareLink(rec);
+      if (confirm('Stuti created! Would you like to copy the share link for other accounts/devices?')) {
+        navigator.clipboard.writeText(shareUrl);
+        toast('Link copied to clipboard!');
+      }
+
       location.hash = '#/library';
     }, 'primary');
-
-    const delBtn = existing ? btn('Delete', () => {
-      if (!confirm('Delete this stuti?')) return;
-      S.stutis = S.stutis.filter((x) => x.id !== existing.id);
-      cleanPath(); save(); toast('Deleted'); location.hash = '#/library';
-    }, 'danger ghost') : null;
 
     app.append(h('div', { class: 'screen' },
       h('h1', { text: existing ? 'Edit stuti' : 'Add a stuti' }),
       h('label', { text: 'Title' }), titleIn,
+      h('label', { text: 'Privacy Setting' }), privacySel,
+      h('label', { text: 'Publishing Author Name' }), authorIn,
       h('label', { text: 'Language' }), langSel,
-      h('div', { class: 'row' },
-        h('div', { class: 'grow' }, h('label', { text: 'Type' }), catSel),
-        h('div', { class: 'grow' }, h('label', { text: 'Deity' }), deityIn)),
-      h('datalist', { id: 'deities' }, DEITIES.map((x) => h('option', { value: x }))),
-      h('label', { text: 'Collection' }), colSel, newColIn,
-      splitTool, photoTool,
-      h('hr'), h('h2', { text: 'Pages' }), pagesBox,
+      pagesBox,
       btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
-      h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn, delBtn)));
+      h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn)));
     renderPages();
   }
 
-  /* ---------- Settings (No Auth) ---------- */
+  /* ---------- Settings ---------- */
   function viewSettings(app) {
+    const authorIn = h('input', {
+      type: 'text',
+      value: S.settings.authorName || 'Ansh',
+      oninput: (e) => { S.settings.authorName = e.target.value; saveLocal(); }
+    });
+
     const themeSel = h('select', {
-      onchange: (e) => { S.settings.theme = e.target.value; save(); applyTheme(); }
+      onchange: (e) => { S.settings.theme = e.target.value; saveLocal(); applyTheme(); }
     }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
        h('option', { value: 'light', selected: S.settings.theme === 'light', text: 'Light' }));
 
     app.append(h('div', { class: 'screen' },
       h('h1', { text: 'Settings' }),
       h('section', { class: 'card' },
-        h('h2', { text: 'Cloud Library' }),
-        h('p', { class: 'muted', text: 'Sur is running in public cloud mode. All added stutis sync automatically for anyone with your link!' })),
+        h('h2', { text: 'Default Publisher Name' }),
+        h('p', { class: 'muted', text: 'This name is attached when publishing public stutis to the cloud.' }),
+        authorIn),
       h('section', { class: 'card' },
         h('h2', { text: 'Appearance' }),
         h('label', { text: 'Theme' }), themeSel)));
   }
 
-  // Initialize Cloud database on startup
   initCloud().then(() => route());
 })();
