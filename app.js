@@ -505,7 +505,8 @@
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
       const isCustom = S.customStutis.some(s => s.id === x.id);
       const isFromCloud = x.collectionId === 'cloud-collection';
-      const canDelete = isCustom || (window.SUR_SEED?.stutis?.some(s => s.id === x.id));
+      // Allow delete if it's custom or not from cloud (i.e., local/samples)
+      const canDelete = isCustom || !isFromCloud;
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
@@ -516,17 +517,18 @@
         h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } })
       ];
       
-      if (canDelete && !isFromCloud) {
+      if (canDelete) {
         buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
           if (confirm('Delete this stuti? This cannot be undone.')) {
-            const isSeed = window.SUR_SEED?.stutis?.some(s => s.id === x.id);
-            
             if (isCustom) {
               S.customStutis = S.customStutis.filter(s => s.id !== x.id);
             }
             
-            if (isSeed) {
-              S.deletedSeedIds.push(x.id);
+            // Track deleted seed stutis so they don't reappear on reload
+            if (!isCustom && !isFromCloud) {
+              if (!S.deletedSeedIds.includes(x.id)) {
+                S.deletedSeedIds.push(x.id);
+              }
             }
             
             S.stutis = S.stutis.filter(s => s.id !== x.id);
