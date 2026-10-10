@@ -11,13 +11,6 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cGxpeWFvbnNjam1jaGRvcXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDM4MzksImV4cCI6MjEwNzIxOTgzOX0.jibwh0r3eRP_FtwA5_EUkq9OT269i9_4gLjTIYF6LG4';
   
   let supabaseClient = null;
-  try {
-    if (window.supabase && SUPABASE_URL) {
-      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
-  } catch (e) {
-    console.error('Supabase init error:', e);
-  }
 
   const KEY = 'sur.v1';
   const LANGS = [
@@ -70,8 +63,10 @@
   let currentUser = null;
 
   async function initAuth() {
-    if (!supabaseClient) return;
     try {
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      
       const { data: { session } } = await supabaseClient.auth.getSession();
       currentUser = session?.user || null;
       supabaseClient.auth.onAuthStateChange((_event, session) => {
@@ -79,13 +74,13 @@
         if (location.hash.slice(1) === '/settings') route();
       });
     } catch (e) {
-      console.error('Auth error:', e);
+      console.error('Failed to initialize Supabase auth:', e);
     }
   }
 
   async function loginWithGoogle() {
     if (!supabaseClient) {
-      toast('Supabase is not configured.');
+      toast('Supabase is still initializing or offline.');
       return;
     }
     const { error } = await supabaseClient.auth.signInWithOAuth({
@@ -642,6 +637,6 @@
         h('label', { text: 'Theme' }), themeSel)));
   }
 
-  // Initialize Auth session on startup and run router
+  // Initialize Auth session on startup and run initial route
   initAuth().then(() => route());
 })();
