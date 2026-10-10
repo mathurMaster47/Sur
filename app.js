@@ -503,10 +503,8 @@
     function row(x) {
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
-      const isCustom = S.customStutis.some(s => s.id === x.id);
       const isFromCloud = x.collectionId === 'cloud-collection';
-      // Allow delete if it's custom or not from cloud (i.e., local/samples)
-      const canDelete = isCustom || !isFromCloud;
+      const isCustom = S.customStutis.some(s => s.id === x.id);
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
@@ -517,7 +515,8 @@
         h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } })
       ];
       
-      if (canDelete) {
+      // Show delete button for everything except cloud stutis
+      if (!isFromCloud) {
         buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
           if (confirm('Delete this stuti? This cannot be undone.')) {
             if (isCustom) {
@@ -525,7 +524,7 @@
             }
             
             // Track deleted seed stutis so they don't reappear on reload
-            if (!isCustom && !isFromCloud) {
+            if (!isCustom) {
               if (!S.deletedSeedIds.includes(x.id)) {
                 S.deletedSeedIds.push(x.id);
               }
