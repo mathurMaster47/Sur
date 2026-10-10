@@ -463,11 +463,23 @@
     function draw() {
       list.replaceChildren();
       S.stutis.forEach(s => {
+        const shareUrl = generateShareLink(s);
+        const buttons = [
+          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')
+        ];
+        
+        if (!s.isPrivate) {
+          buttons.push(h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
+            navigator.clipboard.writeText(shareUrl);
+            toast('Share link copied to clipboard!');
+          }}));
+        }
+        
         list.append(h('div', { class: 'item' },
           h('div', { class: 'name' },
             h('b', { text: s.title }),
             h('span', { class: 'muted', text: `${langName(s.lang)} · ${s.pages.length} page${s.pages.length > 1 ? 's' : ''}` })),
-          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')));
+          ...buttons));
       });
     }
     
@@ -486,16 +498,35 @@
     function row(x) {
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
-      return h('div', { class: 'item' },
-        h('div', { class: 'name' }, 
-          h('b', { text: x.title }),
-          h('span', { class: 'muted', text: `${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+      const isCustom = S.customStutis.some(s => s.id === x.id);
+      
+      const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
-        h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
+        !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
           navigator.clipboard.writeText(shareUrl);
           toast('Share link copied to clipboard!');
-        }}),
-        h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } }));
+        }}) : null,
+        h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } })
+      ];
+      
+      if (isCustom) {
+        buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
+          if (confirm('Delete this stuti? This cannot be undone.')) {
+            S.customStutis = S.customStutis.filter(s => s.id !== x.id);
+            S.stutis = S.stutis.filter(s => s.id !== x.id);
+            S.path = S.path.filter(st => st.id !== x.id);
+            saveLocal();
+            toast('Stuti deleted');
+            draw();
+          }
+        }}));
+      }
+      
+      return h('div', { class: 'item' },
+        h('div', { class: 'name' },
+          h('b', { text: x.title }),
+          h('span', { class: 'muted', text: `${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+        ...buttons.filter(Boolean));
     }
     function draw() {
       const term = q.value.trim().toLowerCase();
