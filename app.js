@@ -105,7 +105,7 @@
           category: row.category || 'stuti',
           lang: row.language || 'hi',
           authorName: row.author_name || 'Anonymous',
-          collectionId: 'cloud-collection',
+          collectionId: row.collection_id || 'cloud-collection',
           pages: row.pages || [],
           isPublic: true
         }));
@@ -114,10 +114,16 @@
           S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
         }
 
+        // Merge all stutis: seed + custom + cloud
+        // Custom stutis take precedence over cloud stutis with same ID
         const map = new Map();
         (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
         S.customStutis.forEach(s => map.set(s.id, s));
-        cloudStutis.forEach(s => map.set(s.id, s));
+        cloudStutis.forEach(s => {
+          if (!map.has(s.id)) {
+            map.set(s.id, s);
+          }
+        });
 
         S.stutis = Array.from(map.values());
         cleanPath();
@@ -161,6 +167,7 @@
         deity: rec.deity,
         language: rec.lang,
         author_name: rec.authorName || 'Anonymous',
+        collection_id: rec.collectionId,
         pages: rec.pages
       });
       if (error) {
@@ -573,11 +580,6 @@
     const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
     const d = existing ? clone(existing)
       : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: mine.id, pages: [{ text: '', translit: null }] };
-    
-    // For existing stutis, if they're private keep their collection, otherwise default to cloud
-    if (existing && !existing.isPrivate) {
-      d.collectionId = 'cloud-collection';
-    }
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
@@ -588,7 +590,6 @@
       onchange: (e) => { 
         d.isPrivate = e.target.value === 'private';
         authorIn.style.display = d.isPrivate ? 'none' : 'block';
-        updateCollectionOptions();
       }
     },
       h('option', { value: 'public', selected: !d.isPrivate, text: ' Public (Publish to Cloud for everyone)' }),
@@ -601,18 +602,9 @@
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
 
+    // Collection selector - always shows for both private and public
     const collSel = h('select', { onchange: (e) => { d.collectionId = e.target.value; } },
       S.collections.map(c => h('option', { value: c.id, selected: c.id === d.collectionId, text: `${c.name} (${stutisIn(c.id).length})` })));
-    
-    // Update collection selector based on privacy
-    function updateCollectionOptions() {
-      if (d.isPrivate) {
-        collSel.style.display = 'block';
-      } else {
-        collSel.style.display = 'none';
-        d.collectionId = 'cloud-collection';
-      }
-    }
 
     // Photo upload and OCR
     let cropper = null;
@@ -749,7 +741,7 @@
         category: d.category,
         lang: d.lang,
         authorName: d.isPrivate ? 'Local User' : d.authorName.trim(),
-        collectionId: d.isPrivate ? d.collectionId : 'cloud-collection',
+        collectionId: d.collectionId,
         pages,
         isPrivate: d.isPrivate,
         updated: Date.now()
@@ -767,21 +759,25 @@
         saveLocal();
         toast('Saved privately on this device!');
       } else {
+        // For public stutis, save to cloud and also to local collection
         const cloudSuccess = await saveToCloud(rec);
         if (cloudSuccess) {
           await fetchCloudStutis();
           toast(`Published to Cloud by ${rec.authorName}!`);
         } else {
           // Fallback to local storage if cloud fails
-          const existingIdx = S.customStutis.findIndex(s => s.id === rec.id);
-          if (existingIdx >= 0) S.customStutis.splice(existingIdx, 1);
-          const stutiIdx = S.stutis.findIndex(s => s.id === rec.id);
-          if (stutiIdx >= 0) S.stutis.splice(stutiIdx, 1);
-          
-          S.customStutis.push(rec);
-          S.stutis.push(rec);
-          saveLocal();
+          toast('Cloud save failed - saving locally only');
         }
+        
+        // Always save to local collection as well for organization
+        const existingIdx = S.customStutis.findIndex(s => s.id === rec.id);
+        if (existingIdx >= 0) S.customStutis.splice(existingIdx, 1);
+        const stutiIdx = S.stutis.findIndex(s => s.id === rec.id);
+        if (stutiIdx >= 0) S.stutis.splice(stutiIdx, 1);
+        
+        S.customStutis.push(rec);
+        S.stutis.push(rec);
+        saveLocal();
       }
 
       // Only show share link for public stutis
@@ -811,9 +807,8 @@
       fileInput,
       camInput));
     
-    // Set initial visibility of author input and collection selector based on privacy
+    // Set initial visibility of author input based on privacy
     authorIn.style.display = d.isPrivate ? 'none' : 'block';
-    updateCollectionOptions();
     renderPages();
   }
 
