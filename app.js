@@ -595,18 +595,130 @@
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
 
+    // Photo upload and OCR
+    let cropper = null;
+    const fileInput = h('input', { type: 'file', accept: 'image/*', style: 'display: none' });
+    const camInput = h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display: none' });
+    
+    function handleImage(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = h('img', { src: e.target.result, style: 'max-width:100%;max-height:400px;display:none' });
+        const modal = h('div', { class: 'modal', style: 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000' },
+          h('div', { style: 'background:#1a1a1a;padding:20px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto' },
+            h('h3', { text: 'Crop Image' }),
+            img,
+            h('div', { class: 'row', style: 'margin-top:10px' },
+              btn('Crop & Extract Text', async () => {
+                if (cropper) {
+                  const canvas = cropper.getCroppedCanvas();
+                  const croppedDataUrl = canvas.toDataURL();
+                  cropper.destroy();
+                  modal.remove();
+                  
+                  toast('Extracting text from image...');
+                  try {
+                    const result = await Tesseract.recognize(croppedDataUrl, OCR[d.lang] || 'hin');
+                    const extractedText = result.data.text;
+                    if (extractedText.trim()) {
+                      d.pages[d.pages.length - 1].text += (d.pages[d.pages.length - 1].text ? '\n' : '') + extractedText;
+                      renderPages();
+                      toast('Text extracted successfully!');
+                    } else {
+                      toast('No text found in image');
+                    }
+                  } catch (err) {
+                    console.error('OCR error:', err);
+                    toast('Failed to extract text from image');
+                  }
+                }
+              }, 'primary'),
+              btn('Cancel', () => {
+                if (cropper) cropper.destroy();
+                modal.remove();
+              }, 'ghost')
+            )
+          )
+        );
+        document.body.append(modal);
+        img.style.display = 'block';
+        
+        setTimeout(() => {
+          cropper = new Cropper(img, {
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.8,
+            restore: false,
+            guides: true,
+            center: true,
+            highlight: false,
+            cropBoxMovable: true,
+            cropBoxResizable: true,
+            toggleDragModeOnDblclick: false
+          });
+        }, 100);
+      };
+      reader.readAsDataURL(file);
+    }
+    
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleImage(e.target.files[0]);
+    });
+    
+    camInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) handleImage(e.target.files[0]);
+    });
+
     function renderPages() {
       pagesBox.replaceChildren();
       d.pages.forEach((pg, i) => {
-        const ta = h('textarea', { rows: 8, placeholder: 'Type page content…' });
-        ta.value = pg.text;
-        ta.addEventListener('input', () => { pg.text = ta.value; });
-        pagesBox.append(h('div', { class: 'page-card' }, h('b', { text: `Page ${i + 1}` }), ta));
+        const textTa = h('textarea', { rows: 8, placeholder: 'Type page content…' });
+        textTa.value = pg.text;
+        textTa.addEventListener('input', () => { 
+          pg.text = textTa.value;
+          updateTranslitPreview();
+        });
+        
+        const translitTa = h('textarea', { rows: 8, placeholder: 'English transliteration (auto-generated, editable)' });
+        translitTa.value = pg.translit || autoRoman(pg.text, d.lang);
+        translitTa.addEventListener('input', () => { 
+          pg.translit = translitTa.value;
+        });
+        
+        const card = h('div', { class: 'page-card' },
+          h('b', { text: `Page ${i + 1}` }),
+          h('div', { class: 'row' },
+            btn('📷 Camera', () => camInput.click(), 'small ghost'),
+            btn('📁 Upload Photo', () => fileInput.click(), 'small ghost')
+          ),
+          h('label', { text: 'Original Text' }),
+          textTa,
+          h('label', { text: 'Transliteration (editable)' }),
+          translitTa
+        );
+        pagesBox.append(card);
+      });
+    }
+    
+    function updateTranslitPreview() {
+      const translitTextareas = pagesBox.querySelectorAll('textarea:nth-of-type(2)');
+      d.pages.forEach((pg, i) => {
+        if (translitTextareas[i] && !pg.translit) {
+          translitTextareas[i].value = autoRoman(pg.text, d.lang);
+        }
       });
     }
 
     const saveBtn = btn(existing ? 'Save changes' : 'Save Stuti', async () => {
-      const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit || null }));
+      // Get transliteration values from the textareas
+      const translitTextareas = pagesBox.querySelectorAll('textarea:nth-of-type(2)');
+      d.pages.forEach((pg, i) => {
+        if (translitTextareas[i]) {
+          pg.translit = translitTextareas[i].value.trim() || null;
+        }
+      });
+      
+      const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit }));
       if (!d.title.trim()) return toast('Please add a title');
       if (!pages.length) return toast('Add at least one page');
       if (!d.isPrivate && !d.authorName.trim()) return toast('Please enter your name for publishing');
@@ -675,7 +787,9 @@
       h('label', { text: 'Language' }), langSel,
       pagesBox,
       btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
-      h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn)));
+      h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn),
+      fileInput,
+      camInput));
     
     // Set initial visibility of author input based on privacy
     authorIn.style.display = d.isPrivate ? 'none' : 'block';

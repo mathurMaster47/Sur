@@ -102,3 +102,7 @@ summary .t { flex: 1; font-weight: 600; }
 .toast { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 20px); background: #000c; color: #fff;
   padding: 10px 16px; border-radius: 999px; opacity: 0; transition: .25s; z-index: 20; max-width: 90vw; font-size: .9rem; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* cropper modal */
+.modal h3 { color: var(--text); margin-bottom: 12px; }
+.modal img { max-width: 100%; max-height: 60vh; display: block; }
