@@ -518,8 +518,7 @@
         !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
           navigator.clipboard.writeText(shareUrl);
           toast('Share link copied to clipboard!');
-        }}) : null,
-        h('button', { class: 'btn small', type: 'button', text: '+ Sur', onclick: () => { S.path.push({ type: 'stuti', id: x.id }); saveLocal(); toast('Added to your Sur'); } })
+        }}) : null
       ];
       
       // Show delete button for everything except cloud stutis
