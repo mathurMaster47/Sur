@@ -1,0 +1,13 @@
+{
+  "name": "Sur – सुर",
+  "short_name": "Sur",
+  "description": "Build your own sequence of stutis and aartis and read them page by page.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#14110f",
+  "theme_color": "#14110f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
