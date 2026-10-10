@@ -14,7 +14,7 @@
   const LANGS = [
     ['hi', 'Hindi', 'हिन्दी'], ['sa', 'Sanskrit', 'संस्कृत'], ['mr', 'Marathi', 'मराठी'],
     ['gu', 'Gujarati', 'ગુજરાતી'], ['pa', 'Punjabi', 'ਪੰਜਾਬੀ'], ['ne', 'Nepali', 'नेपाली'],
-    ['bn', 'Bengali', 'বাংলা'], ['as', 'Assamese', 'অসমীয়া'], ['or', 'Odia', 'ଓଡ଼ିଆ'],
+    ['bn', 'Bengali', 'বাংলা'], ['as', 'Assamese', 'असमीया'], ['or', 'Odia', 'ଓଡ଼ିଆ'],
     ['raj', 'Rajasthani', 'राजस्थानी'], ['bho', 'Bhojpuri', 'भोजपुरी'], ['mai', 'Maithili', 'मैथिली']
   ];
   const OCR = { hi: 'hin', sa: 'san', mr: 'mar', gu: 'guj', pa: 'pan', ne: 'nep', bn: 'ben', as: 'asm', or: 'ori', raj: 'hin', bho: 'hin', mai: 'hin' };
@@ -88,52 +88,54 @@
   /* ---------- cloud & share handling ---------- */
   async function fetchCloudStutis() {
     if (!supabaseClient) return;
-    const { data, error } = await supabaseClient.from('stutis').select('*');
-    if (!error && data) {
-      const cloudStutis = data.map(row => ({
-        id: row.id,
-        title: row.title,
-        deity: row.deity || '',
-        category: row.category || 'stuti',
-        lang: row.language || 'hi',
-        authorName: row.author_name || 'Anonymous',
-        collectionId: 'cloud-collection',
-        pages: row.pages || [],
-        isPublic: true
-      }));
+    try {
+      const { data, error } = await supabaseClient.from('stutis').select('*');
+      if (!error && data) {
+        const cloudStutis = data.map(row => ({
+          id: row.id,
+          title: row.title,
+          deity: row.deity || '',
+          category: row.category || 'stuti',
+          lang: row.language || 'hi',
+          authorName: row.author_name || 'Anonymous',
+          collectionId: 'cloud-collection',
+          pages: row.pages || [],
+          isPublic: true
+        }));
 
-      if (!S.collections.some(c => c.id === 'cloud-collection')) {
-        S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
+        if (!S.collections.some(c => c.id === 'cloud-collection')) {
+          S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
+        }
+
+        const map = new Map();
+        (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
+        S.customStutis.forEach(s => map.set(s.id, s));
+        cloudStutis.forEach(s => map.set(s.id, s));
+
+        S.stutis = Array.from(map.values());
+        cleanPath();
+        route();
       }
-
-      const map = new Map();
-      (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
-      S.customStutis.forEach(s => map.set(s.id, s));
-      cloudStutis.forEach(s => map.set(s.id, s));
-
-      S.stutis = Array.from(map.values());
-      cleanPath();
-      route();
+    } catch(e) {
+      console.error('Fetch cloud error:', e);
     }
   }
 
-  async function initCloud() {
+  function initCloud() {
     try {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        fetchCloudStutis();
 
-      await fetchCloudStutis();
+        checkImportLink();
 
-      // Check URL for imported stuti share link
-      checkImportLink();
-
-      supabaseClient
-        .channel('public:stutis')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'stutis' }, () => {
-          fetchCloudStutis();
-        })
-        .subscribe();
-
+        supabaseClient
+          .channel('public:stutis')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'stutis' }, () => {
+            fetchCloudStutis();
+          })
+          .subscribe();
+      }
     } catch (e) {
       console.error('Cloud connection error:', e);
     }
@@ -200,7 +202,7 @@
     }
     return q;
   }
-  const autoRoman = (text, lang) => window.Translit.transliterate(text, RULES[lang] || lang, S.settings.style);
+  const autoRoman = (text, lang) => window.Translit ? window.Translit.transliterate(text, RULES[lang] || lang, S.settings.style) : text;
   const romanOf = (st, pg) => (pg.translit ? pg.translit : autoRoman(pg.text, st.lang));
   function applyTheme() { document.documentElement.dataset.theme = S.settings.theme; }
 
@@ -530,9 +532,8 @@
         toast(`Published to Cloud by ${rec.authorName}!`);
       }
 
-      // Generate share link
       const shareUrl = generateShareLink(rec);
-      if (confirm('Stuti created! Would you like to copy the share link for other accounts/devices?')) {
+      if (confirm('Stuti created! Copy share link to clipboard?')) {
         navigator.clipboard.writeText(shareUrl);
         toast('Link copied to clipboard!');
       }
@@ -576,5 +577,7 @@
         h('label', { text: 'Theme' }), themeSel)));
   }
 
-  initCloud().then(() => route());
+  // Initial immediate route render so app opens with zero delay, then init cloud
+  route();
+  initCloud();
 })();
