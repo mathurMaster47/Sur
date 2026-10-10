@@ -688,8 +688,8 @@
         const card = h('div', { class: 'page-card' },
           h('b', { text: `Page ${i + 1}` }),
           h('div', { class: 'row' },
-            btn('📷 Camera', () => camInput.click(), 'small ghost'),
-            btn('📁 Upload Photo', () => fileInput.click(), 'small ghost')
+            btn('Camera', () => camInput.click(), 'small ghost'),
+            btn('Upload Photo', () => fileInput.click(), 'small ghost')
           ),
           h('label', { text: 'Original Text' }),
           textTa,
