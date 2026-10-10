@@ -1,14 +1,24 @@
 /* Sur – सुर
  * Build your own sequence of stutis and aartis, read them page by page,
  * and sing along with English-letter transliteration.
- * Plain JavaScript, no build step, no API keys. Data is stored in this browser.
+ * Plain JavaScript, no build step. Data is stored locally and synced with Supabase.
  */
 (function () {
   'use strict';
 
-  /* ---------- constants ---------- */
+  /* ---------- constants & supabase config ---------- */
   const SUPABASE_URL = 'https://qtpliyaonscjmchdoqtt.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cGxpeWFvbnNjam1jaGRvcXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDM4MzksImV4cCI6MjEwNzIxOTgzOX0.jibwh0r3eRP_FtwA5_EUkq9OT269i9_4gLjTIYF6LG4';
+  
+  let supabaseClient = null;
+  try {
+    if (window.supabase && SUPABASE_URL) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  } catch (e) {
+    console.error('Supabase init error:', e);
+  }
+
   const KEY = 'sur.v1';
   const LANGS = [
     ['hi', 'Hindi', 'हिन्दी'], ['sa', 'Sanskrit', 'संस्कृत'], ['mr', 'Marathi', 'मराठी'],
@@ -56,7 +66,43 @@
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2400);
   }
 
-  /* ---------- state ---------- */
+  /* ---------- state & auth ---------- */
+  let currentUser = null;
+
+  async function initAuth() {
+    if (!supabaseClient) return;
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      currentUser = session?.user || null;
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        currentUser = session?.user || null;
+        if (location.hash.slice(1) === '/settings') route();
+      });
+    } catch (e) {
+      console.error('Auth error:', e);
+    }
+  }
+
+  async function loginWithGoogle() {
+    if (!supabaseClient) {
+      toast('Supabase is not configured.');
+      return;
+    }
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+    if (error) toast('Login error: ' + error.message);
+  }
+
+  async function logout() {
+    if (!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    route();
+    toast('Signed out');
+  }
+
   function fresh() {
     const seed = clone(window.SUR_SEED);
     return {
@@ -75,7 +121,7 @@
           return d;
         }
       }
-    } catch (e) { /* ignore and start fresh */ }
+    } catch (e) { /* ignore */ }
     return fresh();
   }
   let S = load();
@@ -222,7 +268,6 @@
       addBox.append(h('div', { class: 'row', style: 'margin-top:10px' }, link('+ Write a new stuti', '#/add', 'small ghost')));
     }
     function redraw() {
-      // keep open <details> state while redrawing
       const open = [...addBox.querySelectorAll('details')].map((d) => d.open);
       renderSeq(); renderAdd();
       addBox.querySelectorAll('details').forEach((d, i) => { d.open = !!open[i]; });
@@ -231,7 +276,7 @@
     app.append(h('div', { class: 'screen' },
       welcome ? h('div', { class: 'hero' }, h('div', { class: 'logo', text: 'सुर' })) : null,
       h('h1', { text: welcome ? 'Build your Sur' : 'Edit your Sur' }),
-      h('p', { class: 'muted', text: 'Choose what you want to recite and in what order, for example Ganesh ji first, then the main stutis, then Raj Bhog, then aarti. You can change it any time.' }),
+      h('p', { class: 'muted', text: 'Choose what you want to recite and in what order...' }),
       seqBox, startRow, addBox));
     renderSeq(); renderAdd();
   }
@@ -272,9 +317,9 @@
       h('div', { class: 'row between' },
         h('a', { class: 'btn small ghost', href: single ? '#/library' : '#/', text: '✕ Close' }),
         h('div', { class: 'row' },
-          h('button', { class: 'btn small', type: 'button', 'aria-label': 'Smaller text', text: 'A−', onclick: () => setSize(-2) }),
-          h('button', { class: 'btn small', type: 'button', 'aria-label': 'Bigger text', text: 'A+', onclick: () => setSize(2) }),
-          h('button', { class: 'btn small', type: 'button', text: S.settings.theme === 'dark' ? '☀' : '☾', 'aria-label': 'Switch theme',
+          h('button', { class: 'btn small', type: 'button', text: 'A−', onclick: () => setSize(-2) }),
+          h('button', { class: 'btn small', type: 'button', text: 'A+', onclick: () => setSize(2) }),
+          h('button', { class: 'btn small', type: 'button', text: S.settings.theme === 'dark' ? '☀' : '☾',
             onclick: (e) => { S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); e.currentTarget.textContent = S.settings.theme === 'dark' ? '☀' : '☾'; }
           }))),
       h('div', { style: 'margin-top:8px' }, titleEl, subEl),
@@ -301,7 +346,7 @@
       const ta = h('textarea', { rows: 10, style: 'font-size:1rem' });
       ta.value = romanOf(st, pg);
       return h('div', null,
-        h('p', { class: 'muted', text: 'Fix the English letters for this page. Your version is saved with the stuti.' }), ta,
+        h('p', { class: 'muted', text: 'Fix the English letters for this page.' }), ta,
         h('div', { class: 'row', style: 'margin-top:10px' },
           btn('Save', () => { pg.translit = ta.value.trim() ? ta.value : null; st.updated = Date.now(); save(); editing = false; draw(); toast('Saved'); }, 'primary'),
           btn('Reset to automatic', () => { pg.translit = null; save(); editing = false; draw(); }),
@@ -310,7 +355,7 @@
     function draw() {
       stage.replaceChildren();
       if (done) {
-        stage.append(h('div', { class: 'done' }, h('h2', { text: 'Completed 🙏' }),
+        stage.append(h('div', { class: 'done' }, h('h2', { text: 'Completed ' }),
           h('p', { class: 'muted', text: 'You reached the end.' }),
           h('div', { class: 'row', style: 'justify-content:center' },
             btn('Start again', () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'), link('Home', '#/', 'ghost'))));
@@ -347,7 +392,6 @@
       editing = false; draw(); window.scrollTo(0, 0);
     }
 
-    // keyboard + swipe
     const onKey = (e) => {
       if (/^(TEXTAREA|INPUT|SELECT)$/.test((e.target.tagName || ''))) return;
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
@@ -364,13 +408,12 @@
       if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) { dx < 0 ? next() : prev(); }
     }, { passive: true });
 
-    // keep the screen awake while reading
     let lock = null;
-    const getLock = async () => { try { if ('wakeLock' in navigator) lock = await navigator.wakeLock.request('screen'); } catch (e) { /* not allowed */ } };
+    const getLock = async () => { try { if ('wakeLock' in navigator) lock = await navigator.wakeLock.request('screen'); } catch (e) {} };
     const onVis = () => { if (document.visibilityState === 'visible') getLock(); };
     getLock();
     document.addEventListener('visibilitychange', onVis);
-    cleanups.push(() => { document.removeEventListener('visibilitychange', onVis); try { lock && lock.release(); } catch (e) { /* ignore */ } });
+    cleanups.push(() => { document.removeEventListener('visibilitychange', onVis); try { lock && lock.release(); } catch (e) {} });
 
     renderSeg(); draw();
   }
@@ -418,7 +461,7 @@
         const s = document.createElement('script');
         s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
         s.onload = () => resolve(window.Tesseract);
-        s.onerror = () => { tesseractPromise = null; reject(new Error('Could not load the text-reading engine. Are you online?')); };
+        s.onerror = () => { tesseractPromise = null; reject(new Error('Could not load text-reading engine.')); };
         document.head.append(s);
       });
     }
@@ -493,7 +536,6 @@
       renderPages();
     }
 
-    // split tool
     const splitTa = h('textarea', { rows: 6, placeholder: 'Paste the whole stuti here…' });
     const splitMode = h('select', null,
       h('option', { value: 'blank', text: 'Split at blank lines' }),
@@ -515,7 +557,6 @@
           addPages(parts); splitTa.value = ''; toast(`Added ${parts.length} page(s)`);
         })));
 
-    // photo tool
     const photoIn = h('input', { type: 'file', accept: 'image/*', multiple: true });
     const photoStatus = h('p', { class: 'muted' });
     photoIn.addEventListener('change', async () => {
@@ -524,7 +565,7 @@
       for (let k = 0; k < files.length; k++) {
         const label = `Reading photo ${k + 1} of ${files.length}`;
         try {
-          photoStatus.textContent = label + '… (the first time, language data is downloaded)';
+          photoStatus.textContent = label + '…';
           const text = await ocr(files[k], d.lang, (p) => { photoStatus.textContent = `${label}… ${Math.round(p * 100)}%`; });
           addPages([text.trim()]);
         } catch (e) {
@@ -532,17 +573,15 @@
           return;
         }
       }
-      photoStatus.textContent = 'Done. Please check every page and fix any mistakes before saving.';
+      photoStatus.textContent = 'Done.';
       photoIn.value = '';
     });
-    const photoTool = h('details', null, h('summary', null, h('span', { class: 't', text: 'Add pages from a photo of a book page' })),
-      h('p', { class: 'muted', text: 'The photo is read on your device and is not uploaded. Use good light, a flat page and one page per photo. Pick the language above first. Reading is never perfect, so always check the result.' }),
-      photoIn, photoStatus);
+    const photoTool = h('details', null, h('summary', null, h('span', { class: 't', text: 'Add pages from a photo' })), photoIn, photoStatus);
 
     const saveBtn = btn(existing ? 'Save changes' : 'Save stuti', () => {
       const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit || null }));
       if (!d.title.trim()) return toast('Please add a title');
-      if (!pages.length) return toast('Add at least one page of text');
+      if (!pages.length) return toast('Add at least one page');
       let cid = d.collectionId;
       if (cid === '__new') {
         const name = newColIn.value.trim();
@@ -556,7 +595,7 @@
     }, 'primary');
 
     const delBtn = existing ? btn('Delete', () => {
-      if (!confirm('Delete this stuti? This cannot be undone.')) return;
+      if (!confirm('Delete this stuti?')) return;
       S.stutis = S.stutis.filter((x) => x.id !== existing.id);
       cleanPath(); save(); toast('Deleted'); location.hash = '#/library';
     }, 'danger ghost') : null;
@@ -564,95 +603,45 @@
     app.append(h('div', { class: 'screen' },
       h('h1', { text: existing ? 'Edit stuti' : 'Add a stuti' }),
       h('label', { text: 'Title' }), titleIn,
-      h('label', { text: 'Language of the text' }), langSel,
+      h('label', { text: 'Language' }), langSel,
       h('div', { class: 'row' },
         h('div', { class: 'grow' }, h('label', { text: 'Type' }), catSel),
-        h('div', { class: 'grow' }, h('label', { text: 'Deity (optional)' }), deityIn)),
+        h('div', { class: 'grow' }, h('label', { text: 'Deity' }), deityIn)),
       h('datalist', { id: 'deities' }, DEITIES.map((x) => h('option', { value: x }))),
       h('label', { text: 'Collection' }), colSel, newColIn,
-      h('h2', { style: 'margin-top:20px', text: 'Pages' }),
-      h('p', { class: 'muted', text: 'Long stutis can have as many pages as you like. English letters are made automatically as you type.' }),
-      pagesBox,
-      h('div', { class: 'row' }, btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small')),
-      h('div', { class: 'card' }, splitTool, photoTool),
-      h('div', { class: 'row', style: 'margin-top:10px' }, saveBtn, link('Cancel', '#/library', 'ghost'), delBtn)));
+      splitTool, photoTool,
+      h('hr'), h('h2', { text: 'Pages' }), pagesBox,
+      btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
+      h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn, delBtn)));
     renderPages();
   }
 
-  /* ---------- Settings ---------- */
-  function seg(options, current, onPick) {
-    const el = h('div', { class: 'seg' });
-    const draw = (cur) => el.replaceChildren(...options.map(([k, l]) => h('button', { type: 'button', class: cur === k ? 'on' : '', text: l, onclick: () => { onPick(k); draw(k); } })));
-    draw(current);
-    return el;
-  }
-  function download(name, text) {
-    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: name });
-    document.body.append(a); a.click(); a.remove();
-  }
-  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
-  function importData(json) {
-    let d;
-    try { d = JSON.parse(json); } catch (e) { return toast('That file is not valid.'); }
-    if (!d || d.app !== 'sur' || !Array.isArray(d.stutis)) return toast('That does not look like a Sur file.');
-    let addedS = 0;
-    (d.collections || []).forEach((c) => {
-      if (c && c.id && !colOf(String(c.id))) S.collections.push({ id: str(c.id, 80), name: str(c.name, 120) || 'Imported', builtin: false });
-    });
-    d.stutis.forEach((x) => {
-      if (!x || !x.id || stutiOf(String(x.id)) || !Array.isArray(x.pages)) return;
-      const pages = x.pages.map((p) => ({ text: str(p && p.text, 20000), translit: p && p.translit ? str(p.translit, 20000) : null })).filter((p) => p.text.trim());
-      if (!pages.length) return;
-      let cid = str(x.collectionId, 80);
-      if (!colOf(cid)) { cid = (S.collections.find((c) => !c.builtin) || S.collections[0]).id; }
-      S.stutis.push({ id: str(x.id, 80), collectionId: cid, title: str(x.title, 200) || 'Untitled', deity: str(x.deity, 60),
-        category: str(x.category, 20) || 'stuti', lang: str(x.lang, 8) || 'hi', pages, updated: Date.now() });
-      addedS++;
-    });
-    save();
-    toast(addedS ? `Imported ${addedS} stuti${addedS > 1 ? 's' : ''}` : 'Nothing new to import');
-  }
-
+  /* ---------- Settings (with Google Auth) ---------- */
   function viewSettings(app) {
-    const importIn = h('input', { type: 'file', accept: '.json,application/json' });
-    importIn.addEventListener('change', async () => {
-      const f = importIn.files[0];
-      if (f) importData(await f.text());
-      importIn.value = '';
-    });
+    const themeSel = h('select', {
+      onchange: (e) => { S.settings.theme = e.target.value; save(); applyTheme(); }
+    }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
+       h('option', { value: 'light', selected: S.settings.theme === 'light', text: 'Light' }));
+
+    const authCard = h('section', { class: 'card' },
+      h('h2', { text: 'Cloud Account' }),
+      currentUser 
+        ? h('div', null,
+            h('p', { class: 'muted', text: `Signed in as: ${currentUser.email}` }),
+            btn('Sign Out', logout, 'danger'))
+        : h('div', null,
+            h('p', { class: 'muted', text: 'Sign in with Google to sync and back up your stutis.' }),
+            btn('Sign in with Google', loginWithGoogle, 'primary'))
+    );
+
     app.append(h('div', { class: 'screen' },
       h('h1', { text: 'Settings' }),
+      authCard,
       h('section', { class: 'card' },
-        h('h3', { text: 'Reading' }),
-        h('label', { text: 'Show text as' }),
-        seg([['orig', 'Original'], ['roman', 'English'], ['both', 'Both']], S.settings.view, (k) => { S.settings.view = k; save(); }),
-        h('label', { text: 'English spelling style' }),
-        seg([['standard', 'Standard (aa, ee, oo)'], ['simple', 'Simple (a for aa)']], S.settings.style, (k) => { S.settings.style = k; save(); }),
-        h('p', { class: 'muted', text: 'Automatic spellings are a best guess. You can correct any page with “Edit English” while reading.' }),
-        h('label', { text: 'Theme' }),
-        seg([['dark', 'Dark'], ['light', 'Light']], S.settings.theme, (k) => { S.settings.theme = k; save(); applyTheme(); }),
-        h('label', { text: 'Text size' }),
-        h('div', { class: 'row' },
-          btn('A−', () => { S.settings.size = Math.max(14, S.settings.size - 2); save(); toast('Size ' + S.settings.size); }, 'small'),
-          btn('A+', () => { S.settings.size = Math.min(48, S.settings.size + 2); save(); toast('Size ' + S.settings.size); }, 'small'))),
-      h('section', { class: 'card' },
-        h('h3', { text: 'Share and back up' }),
-        h('p', { class: 'muted', text: 'Everything is stored in this browser. Save a file to back up, move to another phone, or share your stutis with family.' }),
-        h('div', { class: 'row' },
-          btn('Export all', () => {
-            download('sur-backup.json', JSON.stringify({ app: 'sur', v: 1, collections: S.collections, stutis: S.stutis, path: S.path }, null, 1));
-          }, 'primary')),
-        h('label', { text: 'Import a Sur file' }), importIn),
-      h('section', { class: 'card' },
-        h('h3', { text: 'Reset' }),
-        h('div', { class: 'row' }, btn('Reset my sequence', () => { if (confirm('Clear your sequence?')) { S.path = []; S.pos = null; save(); toast('Sequence cleared'); } }, 'small'),
-          btn('Erase everything', () => { if (confirm('Erase all stutis and settings from this browser?')) { localStorage.removeItem(KEY); S = fresh(); save(); location.hash = '#/'; route(); } }, 'small danger'))),
-      h('p', { class: 'muted', text: 'Sur · सुर' })));
+        h('h2', { text: 'Appearance' }),
+        h('label', { text: 'Theme' }), themeSel)));
   }
 
-  /* ---------- start ---------- */
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
-  route();
+  // Initialize Auth session on startup and run router
+  initAuth().then(() => route());
 })();
