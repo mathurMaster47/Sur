@@ -573,6 +573,11 @@
     const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
     const d = existing ? clone(existing)
       : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: mine.id, pages: [{ text: '', translit: null }] };
+    
+    // For existing stutis, if they're private keep their collection, otherwise default to cloud
+    if (existing && !existing.isPrivate) {
+      d.collectionId = 'cloud-collection';
+    }
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
@@ -583,6 +588,7 @@
       onchange: (e) => { 
         d.isPrivate = e.target.value === 'private';
         authorIn.style.display = d.isPrivate ? 'none' : 'block';
+        updateCollectionOptions();
       }
     },
       h('option', { value: 'public', selected: !d.isPrivate, text: ' Public (Publish to Cloud for everyone)' }),
@@ -594,6 +600,19 @@
 
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
+
+    const collSel = h('select', { onchange: (e) => { d.collectionId = e.target.value; } },
+      S.collections.map(c => h('option', { value: c.id, selected: c.id === d.collectionId, text: `${c.name} (${stutisIn(c.id).length})` })));
+    
+    // Update collection selector based on privacy
+    function updateCollectionOptions() {
+      if (d.isPrivate) {
+        collSel.style.display = 'block';
+      } else {
+        collSel.style.display = 'none';
+        d.collectionId = 'cloud-collection';
+      }
+    }
 
     // Photo upload and OCR
     let cropper = null;
@@ -730,7 +749,7 @@
         category: d.category,
         lang: d.lang,
         authorName: d.isPrivate ? 'Local User' : d.authorName.trim(),
-        collectionId: d.isPrivate ? mine.id : 'cloud-collection',
+        collectionId: d.isPrivate ? d.collectionId : 'cloud-collection',
         pages,
         isPrivate: d.isPrivate,
         updated: Date.now()
@@ -782,6 +801,7 @@
       h('label', { text: 'Title' }), titleIn,
       h('label', { text: 'Deity (optional)' }), deityIn,
       h('label', { text: 'Category' }), catSel,
+      h('label', { text: 'Collection' }), collSel,
       h('label', { text: 'Privacy Setting' }), privacySel,
       h('label', { text: 'Publishing Author Name' }), authorIn,
       h('label', { text: 'Language' }), langSel,
@@ -791,8 +811,9 @@
       fileInput,
       camInput));
     
-    // Set initial visibility of author input based on privacy
+    // Set initial visibility of author input and collection selector based on privacy
     authorIn.style.display = d.isPrivate ? 'none' : 'block';
+    updateCollectionOptions();
     renderPages();
   }
 
