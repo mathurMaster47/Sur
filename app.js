@@ -142,7 +142,10 @@
   }
 
   async function saveToCloud(rec) {
-    if (!supabaseClient) return;
+    if (!supabaseClient) {
+      toast('Cloud not available - saving locally instead');
+      return false;
+    }
     try {
       const { error } = await supabaseClient.from('stutis').upsert({
         id: rec.id,
@@ -153,9 +156,15 @@
         author_name: rec.authorName || 'Anonymous',
         pages: rec.pages
       });
-      if (error) toast('Cloud save error: ' + error.message);
+      if (error) {
+        toast('Cloud save error: ' + error.message + ' - saving locally instead');
+        return false;
+      }
+      return true;
     } catch (e) {
       console.error('Save to cloud failed:', e);
+      toast('Cloud connection failed - saving locally instead');
+      return false;
     }
   }
 
@@ -166,22 +175,30 @@
       try {
         const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
         if (decoded && decoded.title && decoded.pages) {
-          if (!S.customStutis.some(s => s.id === decoded.id)) {
-            S.customStutis.push(decoded);
-            S.stutis.push(decoded);
-            saveLocal();
-            toast(`Imported "${decoded.title}" into your library! `);
-          }
+          // Always import as private local copy to avoid conflicts
+          const imported = clone(decoded);
+          imported.id = uid(); // Generate new ID to avoid conflicts
+          imported.isPrivate = true;
+          imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
+          
+          S.customStutis.push(imported);
+          S.stutis.push(imported);
+          saveLocal();
+          toast(`Imported "${decoded.title}" into your library!`);
+          
+          // Clear the share parameter from URL
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
         }
       } catch (e) {
         console.error('Invalid share link:', e);
+        toast('Could not import from share link');
       }
     }
   }
 
   function generateShareLink(stuti) {
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(stuti))));
-    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/";
+    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/`;
   }
 
   function cleanPath() {
@@ -436,10 +453,11 @@
     const list = h('div');
     function row(x) {
       const shareUrl = generateShareLink(x);
+      const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
       return h('div', { class: 'item' },
         h('div', { class: 'name' }, 
           h('b', { text: x.title }),
-          h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.authorName ? 'By ' + x.authorName + ' · ' : ''}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+          h('span', { class: 'muted', text: `${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
         h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
           navigator.clipboard.writeText(shareUrl);
@@ -478,6 +496,7 @@
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
+    const deityIn = h('input', { type: 'text', placeholder: 'Deity name (optional)', value: d.deity || '', oninput: (e) => { d.deity = e.target.value; } });
     const authorIn = h('input', { type: 'text', placeholder: 'Your Name (Publisher)', value: d.authorName, oninput: (e) => { d.authorName = e.target.value; S.settings.authorName = e.target.value; saveLocal(); } });
     
     const privacySel = h('select', {
@@ -489,6 +508,9 @@
       h('option', { value: 'public', selected: !d.isPrivate, text: ' Public (Publish to Cloud for everyone)' }),
       h('option', { value: 'private', selected: d.isPrivate, text: ' Private (Keep on this device only)' })
     );
+
+    const catSel = h('select', { onchange: (e) => { d.category = e.target.value; } },
+      CATEGORIES.map(([c, n]) => h('option', { value: c, selected: c === d.category, text: n })));
 
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
@@ -522,14 +544,32 @@
       };
 
       if (d.isPrivate) {
+        // Remove existing if editing
+        const existingIdx = S.customStutis.findIndex(s => s.id === rec.id);
+        if (existingIdx >= 0) S.customStutis.splice(existingIdx, 1);
+        const stutiIdx = S.stutis.findIndex(s => s.id === rec.id);
+        if (stutiIdx >= 0) S.stutis.splice(stutiIdx, 1);
+        
         S.customStutis.push(rec);
         S.stutis.push(rec);
         saveLocal();
         toast('Saved privately on this device!');
       } else {
-        await saveToCloud(rec);
-        await fetchCloudStutis();
-        toast(`Published to Cloud by ${rec.authorName}!`);
+        const cloudSuccess = await saveToCloud(rec);
+        if (cloudSuccess) {
+          await fetchCloudStutis();
+          toast(`Published to Cloud by ${rec.authorName}!`);
+        } else {
+          // Fallback to local storage if cloud fails
+          const existingIdx = S.customStutis.findIndex(s => s.id === rec.id);
+          if (existingIdx >= 0) S.customStutis.splice(existingIdx, 1);
+          const stutiIdx = S.stutis.findIndex(s => s.id === rec.id);
+          if (stutiIdx >= 0) S.stutis.splice(stutiIdx, 1);
+          
+          S.customStutis.push(rec);
+          S.stutis.push(rec);
+          saveLocal();
+        }
       }
 
       const shareUrl = generateShareLink(rec);
@@ -544,12 +584,17 @@
     app.append(h('div', { class: 'screen' },
       h('h1', { text: existing ? 'Edit stuti' : 'Add a stuti' }),
       h('label', { text: 'Title' }), titleIn,
+      h('label', { text: 'Deity (optional)' }), deityIn,
+      h('label', { text: 'Category' }), catSel,
       h('label', { text: 'Privacy Setting' }), privacySel,
       h('label', { text: 'Publishing Author Name' }), authorIn,
       h('label', { text: 'Language' }), langSel,
       pagesBox,
       btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
       h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn)));
+    
+    // Set initial visibility of author input based on privacy
+    authorIn.style.display = d.isPrivate ? 'none' : 'block';
     renderPages();
   }
 
