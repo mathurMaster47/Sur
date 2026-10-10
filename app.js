@@ -167,7 +167,6 @@
         deity: rec.deity,
         language: rec.lang,
         author_name: rec.authorName || 'Anonymous',
-        collection_id: rec.collectionId,
         pages: rec.pages
       });
       if (error) {
