@@ -1,7 +1,7 @@
 /* Sur – सुर
  * Build your own sequence of stutis and aartis, read them page by page,
  * and sing along with English-letter transliteration.
- * Plain JavaScript, no build step. Data is stored locally and synced with Supabase.
+ * Public Cloud version: synced globally via Supabase, no login required.
  */
 (function () {
   'use strict';
@@ -59,45 +59,7 @@
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2400);
   }
 
-  /* ---------- state & auth ---------- */
-  let currentUser = null;
-
-  async function initAuth() {
-    try {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      currentUser = session?.user || null;
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
-        currentUser = session?.user || null;
-        if (location.hash.slice(1) === '/settings') route();
-      });
-    } catch (e) {
-      console.error('Failed to initialize Supabase auth:', e);
-    }
-  }
-
-  async function loginWithGoogle() {
-    if (!supabaseClient) {
-      toast('Supabase is still initializing or offline.');
-      return;
-    }
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.href }
-    });
-    if (error) toast('Login error: ' + error.message);
-  }
-
-  async function logout() {
-    if (!supabaseClient) return;
-    await supabaseClient.auth.signOut();
-    currentUser = null;
-    route();
-    toast('Signed out');
-  }
-
+  /* ---------- state & cloud sync ---------- */
   function fresh() {
     const seed = clone(window.SUR_SEED);
     return {
@@ -105,6 +67,8 @@
       settings: { view: 'both', size: 24, theme: 'dark', style: 'standard' }
     };
   }
+
+  let S = load();
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
@@ -116,14 +80,69 @@
           return d;
         }
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {}
     return fresh();
   }
-  let S = load();
+
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(S)); }
-    catch (e) { toast('Could not save – browser storage may be full.'); }
+    catch (e) { toast('Could not save locally.'); }
   }
+
+  async function initCloud() {
+    try {
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      
+      // Fetch public stutis from Supabase cloud
+      const { data, error } = await supabaseClient.from('stutis').select('*');
+      if (!error && data && data.length > 0) {
+        // Map cloud database columns to app format
+        const cloudStutis = data.map(row => ({
+          id: row.id,
+          title: row.title,
+          deity: row.deity || '',
+          category: row.category || 'stuti',
+          lang: row.language || 'hi',
+          collectionId: 'cloud-collection',
+          pages: row.pages || []
+        }));
+
+        // Ensure cloud collection exists
+        if (!S.collections.some(c => c.id === 'cloud-collection')) {
+          S.collections.push({ id: 'cloud-collection', name: 'Cloud Community', builtin: false });
+        }
+
+        // Merge cloud stutis with seed stutis
+        const seedStutis = clone(window.SUR_SEED).stutis;
+        const map = new Map();
+        seedStutis.forEach(s => map.set(s.id, s));
+        cloudStutis.forEach(s => map.set(s.id, s));
+        S.stutis = Array.from(map.values());
+        save();
+        route();
+      }
+    } catch (e) {
+      console.error('Cloud sync offline:', e);
+    }
+  }
+
+  async function saveToCloud(rec) {
+    if (!supabaseClient) return;
+    try {
+      await supabaseClient.from('stutis').upsert({
+        id: rec.id,
+        title: rec.title,
+        category: rec.category,
+        deity: rec.deity,
+        language: rec.lang,
+        pages: rec.pages
+      });
+    } catch (e) {
+      console.error('Error saving to cloud:', e);
+    }
+  }
+
   function cleanPath() {
     S.path = S.path.filter((st) => st.type === 'collection'
       ? S.collections.some((c) => c.id === st.id)
@@ -150,7 +169,7 @@
   /* ---------- router ---------- */
   let cleanups = [];
   function route() {
-    cleanups.forEach((f) => { try { f(); } catch (e) { /* ignore */ } });
+    cleanups.forEach((f) => { try { f(); } catch (e) {} });
     cleanups = [];
     document.body.classList.remove('reading');
     applyTheme();
@@ -195,7 +214,7 @@
     app.append(h('div', { class: 'screen' },
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
-        h('p', { class: 'muted', text: 'Your prayers, in your order.' })),
+        h('p', { class: 'muted', text: 'Your prayers, in your order. Public Cloud Edition.' })),
       h('section', { class: 'card' },
         h('h2', { text: 'Your Sur' }),
         h('ol', { class: 'steps' }, S.path.map((st) => {
@@ -219,7 +238,7 @@
       seqBox.replaceChildren(h('h2', { text: 'Your sequence' }));
       cleanPath();
       if (!S.path.length) {
-        seqBox.append(h('p', { class: 'muted', text: 'Nothing yet. Add collections or single stutis from the list below, in the order you want to read them.' }));
+        seqBox.append(h('p', { class: 'muted', text: 'Nothing yet. Add collections or single stutis from the list below.' }));
       } else {
         const ol = h('ol', { class: 'steps' });
         S.path.forEach((st, i) => {
@@ -227,9 +246,9 @@
           if (!info) return;
           ol.append(h('li', null,
             h('div', { class: 'name' }, h('b', { text: info.name }), h('span', { class: 'muted', text: info.sub })),
-            h('button', { class: 'btn small', type: 'button', 'aria-label': 'Move up', text: '▲', disabled: i === 0, onclick: () => move(i, -1) }),
-            h('button', { class: 'btn small', type: 'button', 'aria-label': 'Move down', text: '▼', disabled: i === S.path.length - 1, onclick: () => move(i, 1) }),
-            h('button', { class: 'btn small danger', type: 'button', 'aria-label': 'Remove', text: '✕', onclick: () => { S.path.splice(i, 1); save(); redraw(); } })));
+            h('button', { class: 'btn small', type: 'button', text: '▲', disabled: i === 0, onclick: () => move(i, -1) }),
+            h('button', { class: 'btn small', type: 'button', text: '▼', disabled: i === S.path.length - 1, onclick: () => move(i, 1) }),
+            h('button', { class: 'btn small danger', type: 'button', text: '✕', onclick: () => { S.path.splice(i, 1); save(); redraw(); } })));
         });
         seqBox.append(ol);
       }
@@ -246,7 +265,7 @@
     function addStep(type, id) { S.path.push({ type, id }); save(); redraw(); }
     function renderAdd() {
       addBox.replaceChildren(h('h2', { text: 'Add to your sequence' }),
-        h('p', { class: 'muted', text: 'Add a whole collection, or open it to pick single stutis. The same item can be added more than once.' }));
+        h('p', { class: 'muted', text: 'Add a whole collection, or pick single stutis.' }));
       S.collections.forEach((c) => {
         const items = stutisIn(c.id);
         addBox.append(h('details', null,
@@ -271,7 +290,7 @@
     app.append(h('div', { class: 'screen' },
       welcome ? h('div', { class: 'hero' }, h('div', { class: 'logo', text: 'सुर' })) : null,
       h('h1', { text: welcome ? 'Build your Sur' : 'Edit your Sur' }),
-      h('p', { class: 'muted', text: 'Choose what you want to recite and in what order...' }),
+      h('p', { class: 'muted', text: 'Choose what you want to recite and in what order.' }),
       seqBox, startRow, addBox));
     renderSeq(); renderAdd();
   }
@@ -343,8 +362,8 @@
       return h('div', null,
         h('p', { class: 'muted', text: 'Fix the English letters for this page.' }), ta,
         h('div', { class: 'row', style: 'margin-top:10px' },
-          btn('Save', () => { pg.translit = ta.value.trim() ? ta.value : null; st.updated = Date.now(); save(); editing = false; draw(); toast('Saved'); }, 'primary'),
-          btn('Reset to automatic', () => { pg.translit = null; save(); editing = false; draw(); }),
+          btn('Save', () => { pg.translit = ta.value.trim() ? ta.value : null; st.updated = Date.now(); save(); saveToCloud(st); editing = false; draw(); toast('Saved to cloud'); }, 'primary'),
+          btn('Reset', () => { pg.translit = null; save(); saveToCloud(st); editing = false; draw(); }),
           btn('Cancel', () => { editing = false; draw(); }, 'ghost')));
     }
     function draw() {
@@ -573,7 +592,7 @@
     });
     const photoTool = h('details', null, h('summary', null, h('span', { class: 't', text: 'Add pages from a photo' })), photoIn, photoStatus);
 
-    const saveBtn = btn(existing ? 'Save changes' : 'Save stuti', () => {
+    const saveBtn = btn(existing ? 'Save changes' : 'Save stuti', async () => {
       const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit || null }));
       if (!d.title.trim()) return toast('Please add a title');
       if (!pages.length) return toast('Add at least one page');
@@ -586,7 +605,10 @@
       }
       const rec = { id: existing ? existing.id : uid(), title: d.title.trim(), deity: (d.deity || '').trim(), category: d.category, lang: d.lang, collectionId: cid, pages, updated: Date.now() };
       if (existing) S.stutis[S.stutis.indexOf(existing)] = rec; else S.stutis.push(rec);
-      save(); toast('Saved'); location.hash = '#/library';
+      save();
+      await saveToCloud(rec);
+      toast('Saved & synced to cloud!');
+      location.hash = '#/library';
     }, 'primary');
 
     const delBtn = existing ? btn('Delete', () => {
@@ -611,32 +633,23 @@
     renderPages();
   }
 
-  /* ---------- Settings (with Google Auth) ---------- */
+  /* ---------- Settings (No Auth) ---------- */
   function viewSettings(app) {
     const themeSel = h('select', {
       onchange: (e) => { S.settings.theme = e.target.value; save(); applyTheme(); }
     }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
        h('option', { value: 'light', selected: S.settings.theme === 'light', text: 'Light' }));
 
-    const authCard = h('section', { class: 'card' },
-      h('h2', { text: 'Cloud Account' }),
-      currentUser 
-        ? h('div', null,
-            h('p', { class: 'muted', text: `Signed in as: ${currentUser.email}` }),
-            btn('Sign Out', logout, 'danger'))
-        : h('div', null,
-            h('p', { class: 'muted', text: 'Sign in with Google to sync and back up your stutis.' }),
-            btn('Sign in with Google', loginWithGoogle, 'primary'))
-    );
-
     app.append(h('div', { class: 'screen' },
       h('h1', { text: 'Settings' }),
-      authCard,
+      h('section', { class: 'card' },
+        h('h2', { text: 'Cloud Library' }),
+        h('p', { class: 'muted', text: 'Sur is running in public cloud mode. All added stutis sync automatically for anyone with your link!' })),
       h('section', { class: 'card' },
         h('h2', { text: 'Appearance' }),
         h('label', { text: 'Theme' }), themeSel)));
   }
 
-  // Initialize Auth session on startup and run initial route
-  initAuth().then(() => route());
+  // Initialize Cloud database on startup
+  initCloud().then(() => route());
 })();
