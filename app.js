@@ -105,7 +105,7 @@
           category: row.category || 'stuti',
           lang: row.language || 'hi',
           authorName: row.author_name || 'Anonymous',
-          collectionId: row.collection_id || 'cloud-collection',
+          collectionId: 'cloud-collection',
           pages: row.pages || [],
           isPublic: true
         }));
@@ -120,6 +120,7 @@
         (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
         S.customStutis.forEach(s => map.set(s.id, s));
         cloudStutis.forEach(s => {
+          // Only add cloud stuti if not already in customStutis
           if (!map.has(s.id)) {
             map.set(s.id, s);
           }
