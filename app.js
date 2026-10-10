@@ -61,7 +61,7 @@
     const seed = clone(window.SUR_SEED || { collections: [], stutis: [] });
     return {
       v: 1, collections: seed.collections, stutis: seed.stutis, customStutis: [], path: [], pos: null,
-      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard', authorName: 'Ansh' }
+      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard' }
     };
   }
 
@@ -73,6 +73,8 @@
       if (raw) {
         const d = JSON.parse(raw);
         d.settings = Object.assign(fresh().settings, d.settings || {});
+        // Remove old authorName from settings for backwards compatibility
+        if (d.settings.authorName) delete d.settings.authorName;
         d.customStutis = Array.isArray(d.customStutis) ? d.customStutis : [];
         return d;
       }
@@ -237,6 +239,7 @@
     app.replaceChildren();
     if (path === '/') viewHome(app);
     else if (path === '/path') viewPath(app, false);
+    else if (path === '/select') viewSelect(app);
     else if (path === '/library') viewLibrary(app);
     else if (path === '/add') viewEdit(app, null);
     else if (path.startsWith('/edit/')) viewEdit(app, decodeURIComponent(path.slice(6)));
@@ -282,7 +285,11 @@
         h('div', { class: 'row' },
           link('Start', '#/read', 'primary'),
           hasPos ? link('Continue', '#/read?resume=1') : null,
-          link('Edit', '#/path', 'ghost')))));
+          link('Edit', '#/path', 'ghost'))),
+      h('section', { class: 'card' },
+        h('h2', { text: 'Quick Read' }),
+        h('p', { class: 'muted', text: 'Choose a single stuti to read right now.' }),
+        link('Select what to read', '#/select', 'primary'))));
   }
 
   /* ---------- Path builder ---------- */
@@ -412,7 +419,9 @@
       if (done) {
         stage.append(h('div', { class: 'done' }, h('h2', { text: 'Completed ' }),
           h('div', { class: 'row', style: 'justify-content:center' },
-            btn('Start again', () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'), link('Home', '#/', 'ghost'))));
+            btn('Start again', () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'),
+            link('Choose another', '#/select', 'ghost'),
+            link('Home', '#/', 'ghost'))));
         fill.style.width = '100%'; titleEl.textContent = 'Completed'; subEl.textContent = '';
         pageLabel.textContent = ''; nextBtn.disabled = true; prevBtn.disabled = false;
         return;
@@ -445,6 +454,29 @@
     }
 
     renderSeg(); draw();
+  }
+
+  /* ---------- Select what to read ---------- */
+  function viewSelect(app) {
+    const list = h('div');
+    
+    function draw() {
+      list.replaceChildren();
+      S.stutis.forEach(s => {
+        list.append(h('div', { class: 'item' },
+          h('div', { class: 'name' },
+            h('b', { text: s.title }),
+            h('span', { class: 'muted', text: `${langName(s.lang)} · ${s.pages.length} page${s.pages.length > 1 ? 's' : ''}` })),
+          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')));
+      });
+    }
+    
+    app.append(h('div', { class: 'screen' },
+      h('div', { class: 'hero' },
+        h('div', { class: 'logo', text: 'सुर' }),
+        h('p', { class: 'muted', text: 'What would you like to read today?' })),
+      list));
+    draw();
   }
 
   /* ---------- Library ---------- */
@@ -492,12 +524,12 @@
     const existing = id ? stutiOf(id) : null;
     const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
     const d = existing ? clone(existing)
-      : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: S.settings.authorName || 'Ansh', collectionId: mine.id, pages: [{ text: '', translit: null }] };
+      : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: mine.id, pages: [{ text: '', translit: null }] };
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
     const deityIn = h('input', { type: 'text', placeholder: 'Deity name (optional)', value: d.deity || '', oninput: (e) => { d.deity = e.target.value; } });
-    const authorIn = h('input', { type: 'text', placeholder: 'Your Name (Publisher)', value: d.authorName, oninput: (e) => { d.authorName = e.target.value; S.settings.authorName = e.target.value; saveLocal(); } });
+    const authorIn = h('input', { type: 'text', placeholder: 'Your Name (Publisher)', value: d.authorName, oninput: (e) => { d.authorName = e.target.value; } });
     
     const privacySel = h('select', {
       onchange: (e) => { 
@@ -529,18 +561,19 @@
       const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit || null }));
       if (!d.title.trim()) return toast('Please add a title');
       if (!pages.length) return toast('Add at least one page');
+      if (!d.isPrivate && !d.authorName.trim()) return toast('Please enter your name for publishing');
 
-      const rec = { 
-        id: d.id, 
-        title: d.title.trim(), 
-        deity: (d.deity || '').trim(), 
-        category: d.category, 
-        lang: d.lang, 
-        authorName: d.isPrivate ? 'Local User' : (d.authorName.trim() || 'Ansh'),
-        collectionId: d.isPrivate ? mine.id : 'cloud-collection', 
-        pages, 
+      const rec = {
+        id: d.id,
+        title: d.title.trim(),
+        deity: (d.deity || '').trim(),
+        category: d.category,
+        lang: d.lang,
+        authorName: d.isPrivate ? 'Local User' : d.authorName.trim(),
+        collectionId: d.isPrivate ? mine.id : 'cloud-collection',
+        pages,
         isPrivate: d.isPrivate,
-        updated: Date.now() 
+        updated: Date.now()
       };
 
       if (d.isPrivate) {
@@ -572,10 +605,13 @@
         }
       }
 
-      const shareUrl = generateShareLink(rec);
-      if (confirm('Stuti created! Copy share link to clipboard?')) {
-        navigator.clipboard.writeText(shareUrl);
-        toast('Link copied to clipboard!');
+      // Only show share link for public stutis
+      if (!d.isPrivate) {
+        const shareUrl = generateShareLink(rec);
+        if (confirm('Stuti created! Copy share link to clipboard?')) {
+          navigator.clipboard.writeText(shareUrl);
+          toast('Link copied to clipboard!');
+        }
       }
 
       location.hash = '#/library';
@@ -600,12 +636,6 @@
 
   /* ---------- Settings ---------- */
   function viewSettings(app) {
-    const authorIn = h('input', {
-      type: 'text',
-      value: S.settings.authorName || 'Ansh',
-      oninput: (e) => { S.settings.authorName = e.target.value; saveLocal(); }
-    });
-
     const themeSel = h('select', {
       onchange: (e) => { S.settings.theme = e.target.value; saveLocal(); applyTheme(); }
     }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
@@ -613,10 +643,6 @@
 
     app.append(h('div', { class: 'screen' },
       h('h1', { text: 'Settings' }),
-      h('section', { class: 'card' },
-        h('h2', { text: 'Default Publisher Name' }),
-        h('p', { class: 'muted', text: 'This name is attached when publishing public stutis to the cloud.' }),
-        authorIn),
       h('section', { class: 'card' },
         h('h2', { text: 'Appearance' }),
         h('label', { text: 'Theme' }), themeSel)));
