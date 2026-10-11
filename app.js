@@ -193,10 +193,16 @@
           .from('stutis')
           .select('*')
           .eq('id', shareId)
-          .single();
+          .maybeSingle();
         
-        if (error || !data) {
-          toast('Could not find shared stuti');
+        if (error) {
+          console.error('Database error:', error);
+          toast('Error loading stuti: ' + error.message);
+          return;
+        }
+        
+        if (!data) {
+          toast('Stuti not found. It may have been deleted or the link is invalid.');
           return;
         }
         
@@ -789,6 +795,16 @@
         if (cloudSuccess) {
           await fetchCloudStutis();
           toast(`Published to Cloud by ${rec.authorName}!`);
+          
+          // Wait a moment for cloud to propagate
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Show share link only if cloud save succeeded
+          const shareUrl = generateShareLink(rec);
+          if (confirm(`Stuti created!\n\nShare link:\n${shareUrl}\n\nCopy to clipboard?`)) {
+            navigator.clipboard.writeText(shareUrl);
+            toast('Link copied to clipboard!');
+          }
         } else {
           // Fallback to local storage if cloud fails
           toast('Cloud save failed - saving locally only');
@@ -803,15 +819,6 @@
         S.customStutis.push(rec);
         S.stutis.push(rec);
         saveLocal();
-      }
-
-      // Only show share link for public stutis
-      if (!d.isPrivate) {
-        const shareUrl = generateShareLink(rec);
-        if (confirm(`Stuti created!\n\nShare link:\n${shareUrl}\n\nCopy to clipboard?`)) {
-          navigator.clipboard.writeText(shareUrl);
-          toast('Link copied to clipboard!');
-        }
       }
 
       location.hash = '#/library';
