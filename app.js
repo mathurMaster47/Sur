@@ -183,26 +183,25 @@
         isPublic: true
       }));
 
-        if (!S.collections.some(c => c.id === 'cloud-collection')) {
-          S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
-        }
-
-        // Merge all stutis: seed + custom + cloud
-        // Custom stutis take precedence over cloud stutis with same ID
-        const map = new Map();
-        (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
-        S.customStutis.forEach(s => map.set(s.id, s));
-        cloudStutis.forEach(s => {
-          // Only add cloud stuti if not already in customStutis
-          if (!map.has(s.id)) {
-            map.set(s.id, s);
-          }
-        });
-
-        S.stutis = Array.from(map.values());
-        cleanPath();
-        route();
+      if (!S.collections.some(c => c.id === 'cloud-collection')) {
+        S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
       }
+
+      // Merge all stutis: seed + custom + cloud
+      // Custom stutis take precedence over cloud stutis with same ID
+      const map = new Map();
+      (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
+      S.customStutis.forEach(s => map.set(s.id, s));
+      cloudStutis.forEach(s => {
+        // Only add cloud stuti if not already in customStutis
+        if (!map.has(s.id)) {
+          map.set(s.id, s);
+        }
+      });
+
+      S.stutis = Array.from(map.values());
+      cleanPath();
+      route();
     } catch(e) {
       console.error('Fetch cloud error:', e);
     }
