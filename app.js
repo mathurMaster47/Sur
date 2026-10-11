@@ -8,6 +8,7 @@
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzltbjBQxM-1_xLg30P1TNgKJPLf135MkUmLhl6WlUfWod1wQIJXCYry1iCM-xFX6Pr/exec';
 
   const KEY = 'sur.v1';
+  const CLOUD_COLLECTION_ID = 'cloud-collection';
   const RETIRED_SAMPLE_IDS = new Set(['s-ganesh-1', 's-navratri-1', 's-rajbhog-1', 's-aarti-1']);
   const LANGS = [
     ['hi', 'Hindi', 'हिन्दी'], ['sa', 'Sanskrit', 'संस्कृत'], ['mr', 'Marathi', 'मराठी'],
@@ -174,6 +175,17 @@
   /* ---------- cloud & share handling ---------- */
   async function fetchCloudStutis() {
     try {
+      ensureCloudCollection();
+      let migratedPublicStutis = false;
+      S.customStutis.forEach((stuti) => {
+        const collectionIds = ensureArray(stuti.collectionId);
+        if (!stuti.isPrivate && !collectionIds.includes(CLOUD_COLLECTION_ID)) {
+          stuti.collectionId = [...collectionIds, CLOUD_COLLECTION_ID];
+          migratedPublicStutis = true;
+        }
+      });
+      if (migratedPublicStutis) saveLocal();
+
       const response = await fetch(GOOGLE_SCRIPT_URL);
       const data = await response.json();
       
@@ -186,14 +198,10 @@
         category: row.category || 'stuti',
         lang: row.language || 'hi',
         authorName: row.author_name || 'Anonymous',
-        collectionId: 'cloud-collection',
+        collectionId: CLOUD_COLLECTION_ID,
         pages: typeof row.pages === 'string' ? JSON.parse(row.pages) : row.pages,
         isPublic: true
       }));
-
-      if (!S.collections.some(c => c.id === 'cloud-collection')) {
-        S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
-      }
 
       // Merge all stutis: seed + custom + cloud
       // Custom stutis take precedence over cloud stutis with same ID
@@ -316,6 +324,11 @@
   const stutisIn = (cid) => S.stutis.filter((x) => ensureArray(x.collectionId).includes(cid));
   const collectionsOf = (stuti) => ensureArray(stuti.collectionId).map(colOf).filter(Boolean);
   const editableCollections = () => S.collections.filter((c) => c.id !== 'cloud-collection');
+  function ensureCloudCollection() {
+    if (!S.collections.some((collection) => collection.id === CLOUD_COLLECTION_ID)) {
+      S.collections.push({ id: CLOUD_COLLECTION_ID, name: 'Cloud Community Library', builtin: false });
+    }
+  }
   const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
   function buildQueue() {
     const q = [];
@@ -917,6 +930,7 @@
       if (!pages.length) return toast('Add at least one page');
       if (!d.isPrivate && !d.authorName.trim()) return toast('Please enter your name for publishing');
       if (existing && !isLocallyEditable && !sudoMode) return toast('Admin mode is required to edit this stuti');
+      if (!d.isPrivate) ensureCloudCollection();
 
       const rec = {
         id: d.id,
@@ -925,7 +939,9 @@
         category: d.category,
         lang: d.lang,
         authorName: d.isPrivate ? 'Local User' : d.authorName.trim(),
-        collectionId: ensureArray(d.collectionId),
+        collectionId: d.isPrivate
+          ? ensureArray(d.collectionId)
+          : [...new Set([...ensureArray(d.collectionId), CLOUD_COLLECTION_ID])],
         pages,
         isPrivate: d.isPrivate,
         updated: Date.now()
