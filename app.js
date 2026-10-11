@@ -296,81 +296,6 @@
     return `${window.location.origin}${window.location.pathname}?share=${encoded}#/library`;
   }
   
-  function exportStutiAsJson(stuti) {
-    try {
-      console.log('Exporting stuti:', stuti);
-      console.log('Stuti ID:', stuti.id);
-      console.log('Stuti title:', stuti.title);
-      console.log('Stuti pages:', stuti.pages);
-      
-      const exportData = {
-        title: stuti.title,
-        deity: stuti.deity,
-        category: stuti.category,
-        lang: stuti.lang,
-        authorName: stuti.authorName,
-        pages: stuti.pages,
-        exportedAt: new Date().toISOString()
-      };
-      const jsonStr = JSON.stringify(exportData, null, 2);
-      
-      console.log('Export JSON:', jsonStr);
-      
-      // Copy to clipboard
-      navigator.clipboard.writeText(jsonStr).then(() => {
-        toast('JSON copied to clipboard! Save as .json file');
-      }).catch(() => {
-        // Fallback to file download if clipboard fails
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${stuti.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast('Exported as JSON file');
-      });
-    } catch (e) {
-      console.error('Export error:', e);
-      toast('Failed to export: ' + e.message);
-    }
-  }
-  
-  function importStutiFromJson(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        console.log('File loaded, parsing...');
-        const data = JSON.parse(e.target.result);
-        console.log('Parsed data:', data);
-        if (data.title && data.pages) {
-          const imported = clone(data);
-          imported.id = uid();
-          imported.isPrivate = true;
-          imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
-          
-          S.customStutis.push(imported);
-          S.stutis.push(imported);
-          saveLocalWithBackup();
-          toast(`Imported "${imported.title}" from file!`);
-          route();
-        } else {
-          console.error('Invalid file structure:', data);
-          toast('Invalid stuti file - missing title or pages');
-        }
-      } catch (err) {
-        console.error('Import error:', err);
-        toast('Could not parse file: ' + err.message);
-      }
-    };
-    reader.onerror = () => {
-      toast('Failed to read file');
-    };
-    reader.readAsText(file);
-  }
-
   function cleanPath() {
     S.path = S.path.filter((st) => st.type === 'collection'
       ? S.collections.some((c) => c.id === st.id)
@@ -630,22 +555,13 @@
   /* ---------- Select what to read ---------- */
   function viewSelect(app) {
     const list = h('div');
-    const importInput = h('input', { type: 'file', accept: '*', style: 'display: none' });
-    
-    importInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
-    });
     
     function draw() {
       list.replaceChildren();
       S.stutis.forEach(s => {
         const shareUrl = generateShareLink(s);
         const buttons = [
-          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary'),
-          h('button', { class: 'btn small', type: 'button', text: ' Export JSON', onclick: () => {
-            exportStutiAsJson(s);
-            toast('Exported as JSON file');
-          }})
+          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')
         ];
         
         if (!s.isPrivate) {
@@ -669,10 +585,7 @@
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
         h('p', { class: 'muted', text: 'What would you like to read today?' })),
-      h('div', { class: 'row' },
-        btn('Import JSON', () => importInput.click(), 'small ghost')),
-      list,
-      importInput));
+      list));
     draw();
   }
 
@@ -683,7 +596,6 @@
       h('option', { value: '', text: 'All categories' }),
       CATEGORIES.map(([id, name]) => h('option', { value: id, text: name })));
     const list = h('div');
-    const importInput = h('input', { type: 'file', accept: '*', style: 'display: none' });
     
     // Create new collection dialog
     function showCreateCollectionDialog() {
@@ -713,10 +625,6 @@
       setTimeout(() => nameInput.focus(), 100);
     }
 
-    importInput.addEventListener('change', (e) => {
-      if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
-    });
-    
     function row(x) {
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
@@ -725,10 +633,6 @@
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
-        h('button', { class: 'btn small', type: 'button', text: ' Export JSON', onclick: () => {
-          exportStutiAsJson(x);
-          toast('Exported as JSON file');
-        }}),
         !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
           if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
             navigator.clipboard.writeText(shareUrl);
@@ -796,10 +700,8 @@
         h('div', { class: 'row' },
           btn('+ Collection', showCreateCollectionDialog, 'small ghost'),
           btn('Restore from Google', () => restoreFromGoogle(), 'small ghost'),
-          btn('Import JSON', () => importInput.click(), 'small ghost'),
           link('+ Add stuti', '#/add', 'primary'))),
-      q, categoryFilter, list,
-      importInput));
+      q, categoryFilter, list));
     draw();
   }
 
