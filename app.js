@@ -141,8 +141,8 @@
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         fetchCloudStutis();
 
-        // Check for share link after a short delay to ensure cloud is ready
-        setTimeout(() => checkImportLink(), 100);
+        // Check for share link (no cloud dependency needed for JSON sharing)
+        checkImportLink();
 
         supabaseClient
           .channel('public:stutis')
@@ -183,64 +183,95 @@
     }
   }
 
-  async function checkImportLink() {
+  function checkImportLink() {
     const params = new URLSearchParams(window.location.search);
-    const shareId = params.get('share');
-    if (shareId && supabaseClient) {
+    const sharedData = params.get('share');
+    if (sharedData) {
       try {
-        toast('Loading shared stuti...');
-        const { data, error } = await supabaseClient
-          .from('stutis')
-          .select('*')
-          .eq('id', shareId)
-          .maybeSingle();
-        
-        if (error) {
-          console.error('Database error:', error);
-          toast('Error loading stuti: ' + error.message);
-          return;
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+        if (decoded && decoded.title && decoded.pages) {
+          // Import as private local copy
+          const imported = clone(decoded);
+          imported.id = uid(); // Generate new ID
+          imported.isPrivate = true;
+          imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
+          
+          S.customStutis.push(imported);
+          S.stutis.push(imported);
+          saveLocal();
+          toast(`Imported "${decoded.title}" into your library!`);
+          
+          // Clear the share parameter from URL
+          window.history.replaceState({}, document.title, window.location.pathname + '#/library');
+          route();
         }
-        
-        if (!data) {
-          toast('Stuti not found. It may have been deleted or the link is invalid.');
-          return;
-        }
-        
-        const sharedStuti = {
-          id: data.id,
-          title: data.title,
-          deity: data.deity || '',
-          category: data.category || 'stuti',
-          lang: data.language || 'hi',
-          authorName: data.author_name || 'Anonymous',
-          pages: data.pages || [],
-          isPrivate: false
-        };
-        
-        // Import as private local copy
-        const imported = clone(sharedStuti);
-        imported.id = uid(); // Generate new ID
-        imported.isPrivate = true;
-        imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
-        
-        S.customStutis.push(imported);
-        S.stutis.push(imported);
-        saveLocal();
-        toast(`Imported "${sharedStuti.title}" into your library!`);
-        
-        // Clear the share parameter from URL
-        window.history.replaceState({}, document.title, window.location.pathname + '#/library');
-        route();
       } catch (e) {
-        console.error('Import error:', e);
+        console.error('Invalid share link:', e);
         toast('Could not import from share link');
       }
     }
   }
 
   function generateShareLink(stuti) {
-    // Use the stuti ID as the share parameter - much shorter link
-    return `${window.location.origin}${window.location.pathname}?share=${stuti.id}#/library`;
+    // Export as JSON data in URL (simple and reliable)
+    const exportData = {
+      title: stuti.title,
+      deity: stuti.deity,
+      category: stuti.category,
+      lang: stuti.lang,
+      authorName: stuti.authorName,
+      pages: stuti.pages
+    };
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(exportData))));
+    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/library`;
+  }
+  
+  function exportStutiAsJson(stuti) {
+    const exportData = {
+      title: stuti.title,
+      deity: stuti.deity,
+      category: stuti.category,
+      lang: stuti.lang,
+      authorName: stuti.authorName,
+      pages: stuti.pages,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${stuti.title.replace(/[^a-z0-9]/gi, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  
+  function importStutiFromJson(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.title && data.pages) {
+          const imported = clone(data);
+          imported.id = uid();
+          imported.isPrivate = true;
+          imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
+          
+          S.customStutis.push(imported);
+          S.stutis.push(imported);
+          saveLocal();
+          toast(`Imported "${imported.title}" from file!`);
+          route();
+        } else {
+          toast('Invalid stuti file');
+        }
+      } catch (err) {
+        console.error('Import error:', err);
+        toast('Could not import file');
+      }
+    };
+    reader.readAsText(file);
   }
 
   function cleanPath() {
@@ -499,17 +530,26 @@
   /* ---------- Select what to read ---------- */
   function viewSelect(app) {
     const list = h('div');
+    const importInput = h('input', { type: 'file', accept: '.json', style: 'display: none' });
+    
+    importInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
+    });
     
     function draw() {
       list.replaceChildren();
       S.stutis.forEach(s => {
         const shareUrl = generateShareLink(s);
         const buttons = [
-          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')
+          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary'),
+          h('button', { class: 'btn small', type: 'button', text: ' Export JSON', onclick: () => {
+            exportStutiAsJson(s);
+            toast('Exported as JSON file');
+          }})
         ];
         
         if (!s.isPrivate) {
-          buttons.push(h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
+          buttons.push(h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
             if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
               navigator.clipboard.writeText(shareUrl);
               toast('Share link copied to clipboard!');
@@ -529,7 +569,10 @@
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
         h('p', { class: 'muted', text: 'What would you like to read today?' })),
-      list));
+      h('div', { class: 'row' },
+        btn('Import JSON', () => importInput.click(), 'small ghost')),
+      list,
+      importInput));
     draw();
   }
 
@@ -537,6 +580,12 @@
   function viewLibrary(app) {
     const q = h('input', { type: 'search', placeholder: 'Search title, deity or text…' });
     const list = h('div');
+    const importInput = h('input', { type: 'file', accept: '.json', style: 'display: none' });
+    
+    importInput.addEventListener('change', (e) => {
+      if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
+    });
+    
     function row(x) {
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
@@ -545,7 +594,11 @@
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
-        !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
+        h('button', { class: 'btn small', type: 'button', text: ' Export JSON', onclick: () => {
+          exportStutiAsJson(x);
+          toast('Exported as JSON file');
+        }}),
+        !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
           if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
             navigator.clipboard.writeText(shareUrl);
             toast('Share link copied to clipboard!');
@@ -600,8 +653,12 @@
     }
     q.addEventListener('input', draw);
     app.append(h('div', { class: 'screen' },
-      h('div', { class: 'row between' }, h('h1', { text: 'Library' }), link('+ Add stuti', '#/add', 'primary')),
-      q, list));
+      h('div', { class: 'row between' }, h('h1', { text: 'Library' }), 
+        h('div', { class: 'row' },
+          btn('Import JSON', () => importInput.click(), 'small ghost'),
+          link('+ Add stuti', '#/add', 'primary'))),
+      q, list,
+      importInput));
     draw();
   }
 
@@ -795,16 +852,6 @@
         if (cloudSuccess) {
           await fetchCloudStutis();
           toast(`Published to Cloud by ${rec.authorName}!`);
-          
-          // Wait a moment for cloud to propagate
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Show share link only if cloud save succeeded
-          const shareUrl = generateShareLink(rec);
-          if (confirm(`Stuti created!\n\nShare link:\n${shareUrl}\n\nCopy to clipboard?`)) {
-            navigator.clipboard.writeText(shareUrl);
-            toast('Link copied to clipboard!');
-          }
         } else {
           // Fallback to local storage if cloud fails
           toast('Cloud save failed - saving locally only');
@@ -819,6 +866,13 @@
         S.customStutis.push(rec);
         S.stutis.push(rec);
         saveLocal();
+        
+        // Show share link for public stutis
+        const shareUrl = generateShareLink(rec);
+        if (confirm(`Stuti created!\n\nShare link:\n${shareUrl}\n\nCopy to clipboard?`)) {
+          navigator.clipboard.writeText(shareUrl);
+          toast('Link copied to clipboard!');
+        }
       }
 
       location.hash = '#/library';
