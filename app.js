@@ -6,7 +6,7 @@
 
   /* ---------- constants & supabase config ---------- */
   const SUPABASE_URL = 'https://qtpliyaonscjmchdoqtt.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cGxpeWFvbnNjam1jaGRvcXR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDM4MzksImV4cCI6MjEwNzIxOTgzOX0.jibwh0r3eRP_FtwA5_EUkq9OT269i9_4gLjTIYF6LG4';
+  const SUPABASE_ANON_KEY = 'sb_publishable_MunyH_usI3gwsPmR8I3UmA_K6qnNw3P';
   
   let supabaseClient = null;
 
@@ -235,6 +235,11 @@
   
   function exportStutiAsJson(stuti) {
     try {
+      console.log('Exporting stuti:', stuti);
+      console.log('Stuti ID:', stuti.id);
+      console.log('Stuti title:', stuti.title);
+      console.log('Stuti pages:', stuti.pages);
+      
       const exportData = {
         title: stuti.title,
         deity: stuti.deity,
@@ -245,6 +250,8 @@
         exportedAt: new Date().toISOString()
       };
       const jsonStr = JSON.stringify(exportData, null, 2);
+      
+      console.log('Export JSON:', jsonStr);
       
       // Copy to clipboard
       navigator.clipboard.writeText(jsonStr).then(() => {
