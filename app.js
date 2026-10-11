@@ -179,7 +179,7 @@
       let migratedPublicStutis = false;
       S.customStutis.forEach((stuti) => {
         const collectionIds = ensureArray(stuti.collectionId);
-        if (!stuti.isPrivate && !collectionIds.includes(CLOUD_COLLECTION_ID)) {
+        if (isPublicStuti(stuti) && !collectionIds.includes(CLOUD_COLLECTION_ID)) {
           stuti.collectionId = [...collectionIds, CLOUD_COLLECTION_ID];
           migratedPublicStutis = true;
         }
@@ -321,7 +321,10 @@
 
   const colOf = (id) => S.collections.find((c) => c.id === id);
   const stutiOf = (id) => S.stutis.find((x) => x.id === id);
-  const stutisIn = (cid) => S.stutis.filter((x) => ensureArray(x.collectionId).includes(cid));
+  const isPublicStuti = (stuti) => stuti.isPublic === true || stuti.isPrivate !== true;
+  const stutisIn = (cid) => cid === CLOUD_COLLECTION_ID
+    ? S.stutis.filter(isPublicStuti)
+    : S.stutis.filter((x) => ensureArray(x.collectionId).includes(cid));
   const collectionsOf = (stuti) => ensureArray(stuti.collectionId).map(colOf).filter(Boolean);
   const editableCollections = () => S.collections.filter((c) => c.id !== 'cloud-collection');
   function ensureCloudCollection() {
