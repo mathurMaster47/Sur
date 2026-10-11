@@ -187,8 +187,10 @@
     const params = new URLSearchParams(window.location.search);
     const sharedData = params.get('share');
     if (sharedData) {
+      console.log('Share data found:', sharedData.substring(0, 100) + '...');
       try {
         const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+        console.log('Decoded data:', decoded);
         if (decoded && decoded.title && decoded.pages) {
           // Import as private local copy
           const imported = clone(decoded);
@@ -204,10 +206,13 @@
           // Clear the share parameter from URL
           window.history.replaceState({}, document.title, window.location.pathname + '#/library');
           route();
+        } else {
+          console.error('Invalid decoded data:', decoded);
+          toast('Invalid stuti data in link');
         }
       } catch (e) {
-        console.error('Invalid share link:', e);
-        toast('Could not import from share link');
+        console.error('Import error:', e);
+        toast('Could not import from share link: ' + e.message);
       }
     }
   }
@@ -222,36 +227,54 @@
       authorName: stuti.authorName,
       pages: stuti.pages
     };
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(exportData))));
+    const jsonStr = JSON.stringify(exportData);
+    const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+    console.log('Generated share link for:', stuti.title);
     return `${window.location.origin}${window.location.pathname}?share=${encoded}#/library`;
   }
   
   function exportStutiAsJson(stuti) {
-    const exportData = {
-      title: stuti.title,
-      deity: stuti.deity,
-      category: stuti.category,
-      lang: stuti.lang,
-      authorName: stuti.authorName,
-      pages: stuti.pages,
-      exportedAt: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${stuti.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const exportData = {
+        title: stuti.title,
+        deity: stuti.deity,
+        category: stuti.category,
+        lang: stuti.lang,
+        authorName: stuti.authorName,
+        pages: stuti.pages,
+        exportedAt: new Date().toISOString()
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(jsonStr).then(() => {
+        toast('JSON copied to clipboard! Save as .json file');
+      }).catch(() => {
+        // Fallback to file download if clipboard fails
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${stuti.title.replace(/[^a-z0-9]/gi, '_')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast('Exported as JSON file');
+      });
+    } catch (e) {
+      console.error('Export error:', e);
+      toast('Failed to export: ' + e.message);
+    }
   }
   
   function importStutiFromJson(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
+        console.log('File loaded, parsing...');
         const data = JSON.parse(e.target.result);
+        console.log('Parsed data:', data);
         if (data.title && data.pages) {
           const imported = clone(data);
           imported.id = uid();
@@ -264,12 +287,16 @@
           toast(`Imported "${imported.title}" from file!`);
           route();
         } else {
-          toast('Invalid stuti file');
+          console.error('Invalid file structure:', data);
+          toast('Invalid stuti file - missing title or pages');
         }
       } catch (err) {
         console.error('Import error:', err);
-        toast('Could not import file');
+        toast('Could not parse file: ' + err.message);
       }
+    };
+    reader.onerror = () => {
+      toast('Failed to read file');
     };
     reader.readAsText(file);
   }
