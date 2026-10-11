@@ -191,17 +191,36 @@
       
       if (!data || !Array.isArray(data)) return;
       
-      const cloudStutis = data.filter(row => !row.is_backup && !S.deletedSeedIds.includes(row.id)).map(row => ({
-        id: row.id,
-        title: row.title,
-        deity: row.deity || '',
-        category: row.category || 'stuti',
-        lang: row.language || 'hi',
-        authorName: row.author_name || 'Anonymous',
-        collectionId: CLOUD_COLLECTION_ID,
-        pages: typeof row.pages === 'string' ? JSON.parse(row.pages) : row.pages,
-        isPublic: true
-      }));
+      const cloudStutis = [];
+      for (const row of data) {
+        if (row.is_backup || row.user_data || String(row.id || '').startsWith('user-backup-')
+          || S.deletedSeedIds.includes(row.id)) continue;
+
+        let pages;
+        try {
+          pages = typeof row.pages === 'string' ? JSON.parse(row.pages) : row.pages;
+        } catch (error) {
+          console.warn('Skipping cloud stuti with invalid page data:', row.id, error);
+          continue;
+        }
+        if (!row.id || !String(row.title || '').trim() || !Array.isArray(pages) || !pages.length
+          || pages.some((page) => !page || typeof page.text !== 'string')) {
+          console.warn('Skipping incomplete cloud stuti:', row.id);
+          continue;
+        }
+
+        cloudStutis.push({
+          id: row.id,
+          title: row.title,
+          deity: row.deity || '',
+          category: row.category || 'stuti',
+          lang: row.language || 'hi',
+          authorName: row.author_name || 'Anonymous',
+          collectionId: CLOUD_COLLECTION_ID,
+          pages,
+          isPublic: true
+        });
+      }
 
       // Merge all stutis: seed + custom + cloud
       // Custom stutis take precedence over cloud stutis with same ID
