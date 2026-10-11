@@ -17,12 +17,14 @@
   const OCR = { hi: 'hin', sa: 'san', mr: 'mar', gu: 'guj', pa: 'pan', ne: 'nep', bn: 'ben', as: 'asm', or: 'ori', raj: 'hin', bho: 'hin', mai: 'hin' };
   const RULES = { raj: 'hi', bho: 'hi', mai: 'hi' };
   const CATEGORIES = [['stuti', 'Stuti'], ['aarti', 'Aarti'], ['chalisa', 'Chalisa'], ['bhajan', 'Bhajan'], ['mantra', 'Mantra'], ['other', 'Other']];
+  const categoryName = (category) => (CATEGORIES.find(([id]) => id === category) || [category, category])[1];
 
   /* ---------- helpers ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
     : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const ensureArray = (val) => Array.isArray(val) ? val : (val ? [val] : []);
 
   function h(tag, props, ...kids) {
     const el = document.createElement(tag);
@@ -74,6 +76,7 @@
         if (d.settings.authorName) delete d.settings.authorName;
         d.customStutis = Array.isArray(d.customStutis) ? d.customStutis : [];
         d.deletedSeedIds = Array.isArray(d.deletedSeedIds) ? d.deletedSeedIds : [];
+
         // Filter out deleted seed stutis
         if (d.deletedSeedIds.length > 0) {
           d.stutis = d.stutis.filter(s => !d.deletedSeedIds.includes(s.id));
@@ -375,7 +378,9 @@
 
   const colOf = (id) => S.collections.find((c) => c.id === id);
   const stutiOf = (id) => S.stutis.find((x) => x.id === id);
-  const stutisIn = (cid) => S.stutis.filter((x) => x.collectionId === cid);
+  const stutisIn = (cid) => S.stutis.filter((x) => ensureArray(x.collectionId).includes(cid));
+  const collectionsOf = (stuti) => ensureArray(stuti.collectionId).map(colOf).filter(Boolean);
+  const editableCollections = () => S.collections.filter((c) => c.id !== 'cloud-collection');
   const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
   function buildQueue() {
     const q = [];
@@ -426,8 +431,8 @@
     }
     const x = stutiOf(step.id);
     if (!x) return null;
-    const c = colOf(x.collectionId);
-    return { name: x.title, sub: `${c ? c.name : ''} · ${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` };
+    const names = collectionsOf(x).map((c) => c.name).join(', ');
+    return { name: x.title, sub: `${names ? names + ' · ' : ''}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` };
   }
 
   function viewHome(app) {
@@ -591,9 +596,9 @@
         return;
       }
       const st = queue[qi], pg = st.pages[pi];
-      const col = colOf(st.collectionId);
+      const collections = collectionsOf(st);
       titleEl.textContent = st.title;
-      subEl.textContent = `${col ? col.name + ' · ' : ''}stuti ${qi + 1}/${queue.length}`;
+      subEl.textContent = `${collections.length ? collections.map((c) => c.name).join(', ') + ' · ' : ''}stuti ${qi + 1}/${queue.length}`;
       pageLabel.textContent = `Page ${pi + 1}/${st.pages.length}`;
       const before = queue.slice(0, qi).reduce((a, s) => a + s.pages.length, 0) + pi + 1;
       fill.style.width = (before / total * 100) + '%';
@@ -672,9 +677,40 @@
   /* ---------- Library ---------- */
   function viewLibrary(app) {
     const q = h('input', { type: 'search', placeholder: 'Search title, deity or text…' });
+    const categoryFilter = h('select', {},
+      h('option', { value: '', text: 'All categories' }),
+      CATEGORIES.map(([id, name]) => h('option', { value: id, text: name })));
     const list = h('div');
     const importInput = h('input', { type: 'file', accept: '*', style: 'display: none' });
     
+    // Create new collection dialog
+    function showCreateCollectionDialog() {
+      const nameInput = h('input', { type: 'text', placeholder: 'Collection name (e.g., Diwali Stuti)' });
+      const dialog = h('div', { class: 'dialog', style: 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000' },
+        h('div', { class: 'card', style: 'padding:20px;max-width:400px;width:90%' },
+          h('h2', { text: 'Create New Collection' }),
+          nameInput,
+          h('div', { class: 'row', style: 'margin-top:20px' },
+            btn('Cancel', () => dialog.remove(), 'ghost'),
+            btn('Create', () => {
+              const name = nameInput.value.trim();
+              if (!name) return toast('Please enter a collection name');
+              if (S.collections.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+                return toast('A collection with that name already exists');
+              }
+              S.collections.push({ id: 'c-' + uid(), name, builtin: false });
+              saveLocal();
+              toast('Collection created: ' + name);
+              dialog.remove();
+              draw();
+            }, 'primary')
+          )
+        )
+      );
+      document.body.append(dialog);
+      setTimeout(() => nameInput.focus(), 100);
+    }
+
     importInput.addEventListener('change', (e) => {
       if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
     });
@@ -682,7 +718,7 @@
     function row(x) {
       const shareUrl = generateShareLink(x);
       const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
-      const isFromCloud = x.collectionId === 'cloud-collection';
+      const isFromCloud = ensureArray(x.collectionId).includes('cloud-collection');
       const isCustom = S.customStutis.some(s => s.id === x.id);
       
       const buttons = [
@@ -699,7 +735,7 @@
         }}) : null
       ];
       
-      // Show delete button for everything except cloud stutis
+      // Show delete button for everything except cloud stutis (unless in sudo mode)
       if (!isFromCloud) {
         buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
           if (confirm('Delete this stuti? This cannot be undone.')) {
@@ -726,32 +762,36 @@
       return h('div', { class: 'item' },
         h('div', { class: 'name' },
           h('b', { text: x.title }),
-          h('span', { class: 'muted', text: `${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+          h('span', { class: 'muted', text: `${categoryName(x.category || 'stuti')} · ${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
         ...buttons.filter(Boolean));
     }
     function draw() {
       const term = q.value.trim().toLowerCase();
+      const category = categoryFilter.value;
       list.replaceChildren();
       S.collections.forEach((c) => {
         let items = stutisIn(c.id);
-        if (term) items = items.filter((s) => (s.title + ' ' + s.deity + ' ' + s.pages.map((p) => p.text).join(' ')).toLowerCase().includes(term));
-        if (term && !items.length) return;
+        if (category) items = items.filter((s) => (s.category || 'stuti') === category);
+        if (term) items = items.filter((s) => (s.title + ' ' + s.deity + ' ' + categoryName(s.category || 'stuti') + ' ' + s.pages.map((p) => p.text).join(' ')).toLowerCase().includes(term));
+        if ((term || category) && !items.length) return;
         list.append(h('section', { class: 'card' },
           h('div', { class: 'row between' }, h('h3', { text: c.name }),
-            term ? null : h('button', { class: 'btn small', type: 'button', text: '+ Whole collection', disabled: !items.length,
+            (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: '+ Whole collection', disabled: !items.length,
               onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast('Added to your Sur'); } })),
           items.length ? items.map(row) : h('p', { class: 'muted', text: 'No stutis yet.' })));
       });
-      if (!list.children.length) list.append(h('p', { class: 'muted', text: 'No matches.' }));
+      if (!list.children.length) list.append(h('p', { class: 'muted', text: term || category ? 'No matches.' : 'No collections yet.' }));
     }
     q.addEventListener('input', draw);
+    categoryFilter.addEventListener('change', draw);
     app.append(h('div', { class: 'screen' },
       h('div', { class: 'row between' }, h('h1', { text: 'Library' }), 
         h('div', { class: 'row' },
+          btn('+ Collection', showCreateCollectionDialog, 'small ghost'),
           btn('Restore from Google', () => restoreFromGoogle(), 'small ghost'),
           btn('Import JSON', () => importInput.click(), 'small ghost'),
           link('+ Add stuti', '#/add', 'primary'))),
-      q, list,
+      q, categoryFilter, list,
       importInput));
     draw();
   }
@@ -759,9 +799,9 @@
   /* ---------- Add / edit ---------- */
   function viewEdit(app, id) {
     const existing = id ? stutiOf(id) : null;
-    const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
+    const mine = editableCollections().find((c) => !c.builtin) || editableCollections()[0] || S.collections[0];
     const d = existing ? clone(existing)
-      : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: mine.id, pages: [{ text: '', translit: null }] };
+      : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: [mine.id], pages: [{ text: '', translit: null }] };
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
@@ -784,9 +824,28 @@
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
 
-    // Collection selector - always shows for both private and public
-    const collSel = h('select', { onchange: (e) => { d.collectionId = e.target.value; } },
-      S.collections.map(c => h('option', { value: c.id, selected: c.id === d.collectionId, text: `${c.name} (${stutisIn(c.id).length})` })));
+    const collBox = h('div', { class: 'card' });
+    function renderCollectionChoices() {
+      const selectedIds = ensureArray(d.collectionId);
+      collBox.replaceChildren(...editableCollections().map((c) => {
+        const checkbox = h('input', {
+          type: 'checkbox',
+          value: c.id,
+          checked: selectedIds.includes(c.id),
+          onchange: (e) => {
+            const nextIds = ensureArray(d.collectionId).filter((id) => id !== c.id);
+            if (e.target.checked) nextIds.push(c.id);
+            if (!nextIds.length) {
+              e.target.checked = true;
+              return toast('Choose at least one collection');
+            }
+            d.collectionId = nextIds;
+          }
+        });
+        return h('label', { class: 'row', style: 'margin:0 0 8px' }, checkbox, h('span', { text: `${c.name} (${stutisIn(c.id).length})` }));
+      }));
+      if (!collBox.children.length) collBox.append(h('p', { class: 'muted', text: 'Create a collection from the Library first.' }));
+    }
 
     // Photo upload and OCR
     let cropper = null;
@@ -923,7 +982,7 @@
         category: d.category,
         lang: d.lang,
         authorName: d.isPrivate ? 'Local User' : d.authorName.trim(),
-        collectionId: d.collectionId,
+        collectionId: ensureArray(d.collectionId),
         pages,
         isPrivate: d.isPrivate,
         updated: Date.now()
@@ -977,7 +1036,7 @@
       h('label', { text: 'Title' }), titleIn,
       h('label', { text: 'Deity (optional)' }), deityIn,
       h('label', { text: 'Category' }), catSel,
-      h('label', { text: 'Collection' }), collSel,
+      h('label', { text: 'Collections (choose one or more)' }), collBox,
       h('label', { text: 'Privacy Setting' }), privacySel,
       h('label', { text: 'Publishing Author Name' }), authorIn,
       h('label', { text: 'Language' }), langSel,
@@ -989,6 +1048,7 @@
     
     // Set initial visibility of author input based on privacy
     authorIn.style.display = d.isPrivate ? 'none' : 'block';
+    renderCollectionChoices();
     renderPages();
   }
 
