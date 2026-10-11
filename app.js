@@ -253,10 +253,11 @@
     const params = new URLSearchParams(window.location.search);
     const sharedData = params.get('share');
     if (sharedData) {
-      console.log('Share data found:', sharedData.substring(0, 100) + '...');
       try {
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
-        console.log('Decoded data:', decoded);
+        const base64 = sharedData.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+        const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        const decoded = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
         if (decoded && decoded.title && decoded.pages) {
           // Import as private local copy
           const imported = clone(decoded);
@@ -284,7 +285,6 @@
   }
 
   function generateShareLink(stuti) {
-    // Export as JSON data in URL (simple and reliable)
     const exportData = {
       title: stuti.title,
       deity: stuti.deity,
@@ -294,9 +294,15 @@
       pages: stuti.pages
     };
     const jsonStr = JSON.stringify(exportData);
-    const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
-    console.log('Generated share link for:', stuti.title);
-    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/library`;
+    const bytes = new TextEncoder().encode(jsonStr);
+    let binary = '';
+    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+    const encoded = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('share', encoded);
+    url.hash = '/library';
+    return url.toString();
   }
   
   function cleanPath() {
@@ -341,7 +347,15 @@
     else if (path === '/select') viewSelect(app);
     else if (path === '/library') viewLibrary(app);
     else if (path === '/add') viewEdit(app, null);
-    else if (path.startsWith('/edit/')) viewEdit(app, decodeURIComponent(path.slice(6)));
+    else if (path.startsWith('/edit/')) {
+      try {
+        viewEdit(app, decodeURIComponent(path.slice(6)));
+      } catch (e) {
+        console.error('Invalid edit URL:', e);
+        toast('Invalid stuti link');
+        location.hash = '#/library';
+      }
+    }
     else if (path === '/read') viewRead(app, params);
     else if (path === '/settings') viewSettings(app);
     else viewHome(app);
