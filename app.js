@@ -112,12 +112,13 @@
       
       const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backupData)
       });
       
       localStorage.setItem('sur-backup-id', backupData.id);
-      console.log('Backup saved to Google Sheets');
+      console.log('Backup sent to Google Sheets (no-cors mode)');
       return true;
     } catch (e) {
       console.error('Backup error:', e);
@@ -220,6 +221,7 @@
     try {
       const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
+        mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: rec.id,
@@ -231,7 +233,7 @@
           pages: rec.pages
         })
       });
-      console.log('Saved to Google Sheets');
+      console.log('Sent to Google Sheets (no-cors mode)');
       return true;
     } catch (e) {
       console.error('Save to cloud failed:', e);
