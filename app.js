@@ -557,7 +557,7 @@
   /* ---------- Select what to read ---------- */
   function viewSelect(app) {
     const list = h('div');
-    const importInput = h('input', { type: 'file', accept: '.json', style: 'display: none' });
+    const importInput = h('input', { type: 'file', accept: '*', style: 'display: none' });
     
     importInput.addEventListener('change', (e) => {
       if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
@@ -607,7 +607,7 @@
   function viewLibrary(app) {
     const q = h('input', { type: 'search', placeholder: 'Search title, deity or text…' });
     const list = h('div');
-    const importInput = h('input', { type: 'file', accept: '.json', style: 'display: none' });
+    const importInput = h('input', { type: 'file', accept: '*', style: 'display: none' });
     
     importInput.addEventListener('change', (e) => {
       if (e.target.files[0]) importStutiFromJson(e.target.files[0]);
