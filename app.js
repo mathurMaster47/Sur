@@ -4,11 +4,8 @@
 (function () {
   'use strict';
 
-  /* ---------- constants & supabase config ---------- */
-  const SUPABASE_URL = 'https://qtpliyaonscjmchdoqtt.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_MunyH_usI3gwsPmR8I3UmA_K6qnNw3P';
-  
-  let supabaseClient = null;
+  /* ---------- constants ---------- */
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzltbjBQxM-1_xLg30P1TNgKJPLf135MkUmLhl6WlUfWod1wQIJXCYry1iCM-xFX6Pr/exec';
 
   const KEY = 'sur.v1';
   const LANGS = [
@@ -91,24 +88,101 @@
     try { localStorage.setItem(KEY, JSON.stringify(S)); }
     catch (e) {}
   }
+  
+  async function saveLocalWithBackup() {
+    saveLocal();
+    // Backup to Google Sheets in background (don't wait)
+    backupToGoogle().catch(e => console.error('Auto-backup failed:', e));
+  }
+
+  /* ---------- Google Sheets backup ---------- */
+  async function backupToGoogle() {
+    try {
+      const backupData = {
+        id: 'user-backup-' + (localStorage.getItem('sur-backup-id') || Date.now()),
+        user_data: JSON.stringify({
+          customStutis: S.customStutis,
+          deletedSeedIds: S.deletedSeedIds,
+          settings: S.settings,
+          path: S.path,
+          backupDate: new Date().toISOString()
+        }),
+        is_backup: true
+      };
+      
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backupData)
+      });
+      
+      localStorage.setItem('sur-backup-id', backupData.id);
+      console.log('Backup saved to Google Sheets');
+      return true;
+    } catch (e) {
+      console.error('Backup error:', e);
+      return false;
+    }
+  }
+  
+  async function restoreFromGoogle() {
+    try {
+      const backupId = localStorage.getItem('sur-backup-id');
+      if (!backupId) {
+        toast('No backup found');
+        return false;
+      }
+      
+      const response = await fetch(GOOGLE_SCRIPT_URL);
+      const data = await response.json();
+      
+      if (!data || !Array.isArray(data)) {
+        toast('Could not fetch backup');
+        return false;
+      }
+      
+      const backup = data.find(row => row.id === backupId);
+      if (!backup) {
+        toast('Backup not found in Google Sheets');
+        return false;
+      }
+      
+      const userData = JSON.parse(backup.user_data);
+      S.customStutis = userData.customStutis || [];
+      S.deletedSeedIds = userData.deletedSeedIds || [];
+      S.settings = userData.settings || S.settings;
+      S.path = userData.path || [];
+      
+      saveLocal();
+      toast('Restored from Google Sheets!');
+      return true;
+    } catch (e) {
+      console.error('Restore error:', e);
+      toast('Restore failed: ' + e.message);
+      return false;
+    }
+  }
 
   /* ---------- cloud & share handling ---------- */
   async function fetchCloudStutis() {
-    if (!supabaseClient) return;
     try {
-      const { data, error } = await supabaseClient.from('stutis').select('*');
-      if (!error && data) {
-        const cloudStutis = data.map(row => ({
-          id: row.id,
-          title: row.title,
-          deity: row.deity || '',
-          category: row.category || 'stuti',
-          lang: row.language || 'hi',
-          authorName: row.author_name || 'Anonymous',
-          collectionId: 'cloud-collection',
-          pages: row.pages || [],
-          isPublic: true
-        }));
+      const response = await fetch(GOOGLE_SCRIPT_URL);
+      const data = await response.json();
+      
+      if (!data || !Array.isArray(data)) return;
+      
+      const cloudStutis = data.filter(row => !row.is_backup).map(row => ({
+        id: row.id,
+        title: row.title,
+        deity: row.deity || '',
+        category: row.category || 'stuti',
+        lang: row.language || 'hi',
+        authorName: row.author_name || 'Anonymous',
+        collectionId: 'cloud-collection',
+        pages: typeof row.pages === 'string' ? JSON.parse(row.pages) : row.pages,
+        isPublic: true
+      }));
 
         if (!S.collections.some(c => c.id === 'cloud-collection')) {
           S.collections.push({ id: 'cloud-collection', name: 'Cloud Community Library', builtin: false });
@@ -137,48 +211,34 @@
 
   function initCloud() {
     try {
-      if (window.supabase) {
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        fetchCloudStutis();
-
-        // Check for share link (no cloud dependency needed for JSON sharing)
-        checkImportLink();
-
-        supabaseClient
-          .channel('public:stutis')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'stutis' }, () => {
-            fetchCloudStutis();
-          })
-          .subscribe();
-      }
+      fetchCloudStutis();
+      checkImportLink();
     } catch (e) {
       console.error('Cloud connection error:', e);
     }
   }
 
   async function saveToCloud(rec) {
-    if (!supabaseClient) {
-      toast('Cloud not available - saving locally instead');
-      return false;
-    }
     try {
-      const { error } = await supabaseClient.from('stutis').upsert({
-        id: rec.id,
-        title: rec.title,
-        category: rec.category,
-        deity: rec.deity,
-        language: rec.lang,
-        author_name: rec.authorName || 'Anonymous',
-        pages: rec.pages
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: rec.id,
+          title: rec.title,
+          deity: rec.deity,
+          category: rec.category,
+          language: rec.lang,
+          author_name: rec.authorName || 'Anonymous',
+          pages: rec.pages
+        })
       });
-      if (error) {
-        toast('Cloud save error: ' + error.message + ' - saving locally instead');
-        return false;
-      }
+      console.log('Saved to Google Sheets');
       return true;
     } catch (e) {
       console.error('Save to cloud failed:', e);
-      toast('Cloud connection failed - saving locally instead');
+      toast('Cloud save failed - saving locally instead');
       return false;
     }
   }
@@ -200,7 +260,7 @@
           
           S.customStutis.push(imported);
           S.stutis.push(imported);
-          saveLocal();
+          saveLocalWithBackup();
           toast(`Imported "${decoded.title}" into your library!`);
           
           // Clear the share parameter from URL
@@ -290,7 +350,7 @@
           
           S.customStutis.push(imported);
           S.stutis.push(imported);
-          saveLocal();
+          saveLocalWithBackup();
           toast(`Imported "${imported.title}" from file!`);
           route();
         } else {
@@ -689,6 +749,7 @@
     app.append(h('div', { class: 'screen' },
       h('div', { class: 'row between' }, h('h1', { text: 'Library' }), 
         h('div', { class: 'row' },
+          btn('Restore from Google', () => restoreFromGoogle(), 'small ghost'),
           btn('Import JSON', () => importInput.click(), 'small ghost'),
           link('+ Add stuti', '#/add', 'primary'))),
       q, list,
