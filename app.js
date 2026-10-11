@@ -8,6 +8,7 @@
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzltbjBQxM-1_xLg30P1TNgKJPLf135MkUmLhl6WlUfWod1wQIJXCYry1iCM-xFX6Pr/exec';
 
   const KEY = 'sur.v1';
+  const RETIRED_SAMPLE_IDS = new Set(['s-ganesh-1', 's-navratri-1', 's-rajbhog-1', 's-aarti-1']);
   const LANGS = [
     ['hi', 'Hindi', 'हिन्दी'], ['sa', 'Sanskrit', 'संस्कृत'], ['mr', 'Marathi', 'मराठी'],
     ['gu', 'Gujarati', 'ગુજરાતી'], ['pa', 'Punjabi', 'ਪੰਜਾਬੀ'], ['ne', 'Nepali', 'नेपाली'],
@@ -82,6 +83,8 @@
         if (d.deletedSeedIds.length > 0) {
           d.stutis = d.stutis.filter(s => !d.deletedSeedIds.includes(s.id));
         }
+        d.stutis = d.stutis.filter((s) => !RETIRED_SAMPLE_IDS.has(s.id)
+          || d.customStutis.some((custom) => custom.id === s.id));
         return d;
       }
     } catch (e) {}
