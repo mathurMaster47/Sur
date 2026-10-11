@@ -18,6 +18,7 @@
   const RULES = { raj: 'hi', bho: 'hi', mai: 'hi' };
   const CATEGORIES = [['stuti', 'Stuti'], ['aarti', 'Aarti'], ['chalisa', 'Chalisa'], ['bhajan', 'Bhajan'], ['mantra', 'Mantra'], ['other', 'Other']];
   const categoryName = (category) => (CATEGORIES.find(([id]) => id === category) || [category, category])[1];
+  const ADMIN_PASSPHRASE = 'pspspspsps';
 
   /* ---------- helpers ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
@@ -175,7 +176,7 @@
       
       if (!data || !Array.isArray(data)) return;
       
-      const cloudStutis = data.filter(row => !row.is_backup).map(row => ({
+      const cloudStutis = data.filter(row => !row.is_backup && !S.deletedSeedIds.includes(row.id)).map(row => ({
         id: row.id,
         title: row.title,
         deity: row.deity || '',
@@ -197,8 +198,8 @@
       (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
       S.customStutis.forEach(s => map.set(s.id, s));
       cloudStutis.forEach(s => {
-        // Only add cloud stuti if not already in customStutis
-        if (!map.has(s.id)) {
+        // Keep local edits authoritative; otherwise later cloud rows replace older copies.
+        if (!S.customStutis.some((custom) => custom.id === s.id)) {
           map.set(s.id, s);
         }
       });
@@ -396,6 +397,7 @@
 
   /* ---------- router ---------- */
   let cleanups = [];
+  let sudoMode = false;
   function route() {
     cleanups.forEach((f) => { try { f(); } catch (e) {} });
     cleanups = [];
@@ -734,17 +736,22 @@
           }
         }}) : null
       ];
+
+      if (sudoMode || isCustom) {
+        buttons.push(link('Edit', '#/edit/' + encodeURIComponent(x.id), 'small'));
+      }
       
-      // Show delete button for everything except cloud stutis (unless in sudo mode)
-      if (!isFromCloud) {
+      if (!isFromCloud || sudoMode) {
         buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
-          if (confirm('Delete this stuti? This cannot be undone.')) {
+          const confirmation = isFromCloud
+            ? 'Hide this cloud stuti from this device? This will not delete its row from Google Sheets.'
+            : 'Delete this stuti? This cannot be undone.';
+          if (confirm(confirmation)) {
             if (isCustom) {
               S.customStutis = S.customStutis.filter(s => s.id !== x.id);
             }
             
-            // Track deleted seed stutis so they don't reappear on reload
-            if (!isCustom) {
+            if (!isCustom || isFromCloud || !x.isPrivate) {
               if (!S.deletedSeedIds.includes(x.id)) {
                 S.deletedSeedIds.push(x.id);
               }
@@ -753,7 +760,7 @@
             S.stutis = S.stutis.filter(s => s.id !== x.id);
             S.path = S.path.filter(st => st.id !== x.id);
             saveLocal();
-            toast('Stuti deleted');
+            toast(isFromCloud ? 'Cloud stuti hidden on this device' : 'Stuti deleted');
             draw();
           }
         }}));
@@ -769,7 +776,7 @@
       const term = q.value.trim().toLowerCase();
       const category = categoryFilter.value;
       list.replaceChildren();
-      S.collections.forEach((c) => {
+      editableCollections().concat(S.collections.filter((c) => c.id === 'cloud-collection')).forEach((c) => {
         let items = stutisIn(c.id);
         if (category) items = items.filter((s) => (s.category || 'stuti') === category);
         if (term) items = items.filter((s) => (s.title + ' ' + s.deity + ' ' + categoryName(s.category || 'stuti') + ' ' + s.pages.map((p) => p.text).join(' ')).toLowerCase().includes(term));
@@ -799,9 +806,25 @@
   /* ---------- Add / edit ---------- */
   function viewEdit(app, id) {
     const existing = id ? stutiOf(id) : null;
+    if (id && !existing) {
+      toast('Stuti not found');
+      location.hash = '#/library';
+      return;
+    }
+    const isAdminEditing = !!existing && sudoMode;
+    const isCloudItem = !!existing && ensureArray(existing.collectionId).includes('cloud-collection');
+    const isLocallyEditable = !!existing && S.customStutis.some((s) => s.id === existing.id);
+    if (existing && !isLocallyEditable && !isAdminEditing) {
+      toast('Unlock admin mode in Settings to edit this stuti');
+      location.hash = '#/library';
+      return;
+    }
     const mine = editableCollections().find((c) => !c.builtin) || editableCollections()[0] || S.collections[0];
     const d = existing ? clone(existing)
       : { id: uid(), title: '', deity: '', category: 'stuti', lang: 'hi', isPrivate: false, authorName: '', collectionId: [mine.id], pages: [{ text: '', translit: null }] };
+    d.collectionId = ensureArray(d.collectionId).filter((collectionId) => collectionId !== 'cloud-collection');
+    if (!d.collectionId.length) d.collectionId = [mine.id];
+    if (isAdminEditing && !isCloudItem && !isLocallyEditable) d.isPrivate = true;
 
     const pagesBox = h('div');
     const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
@@ -974,6 +997,7 @@
       if (!d.title.trim()) return toast('Please add a title');
       if (!pages.length) return toast('Add at least one page');
       if (!d.isPrivate && !d.authorName.trim()) return toast('Please enter your name for publishing');
+      if (existing && !isLocallyEditable && !sudoMode) return toast('Admin mode is required to edit this stuti');
 
       const rec = {
         id: d.id,
@@ -987,6 +1011,7 @@
         isPrivate: d.isPrivate,
         updated: Date.now()
       };
+      S.deletedSeedIds = S.deletedSeedIds.filter((deletedId) => deletedId !== rec.id);
 
       if (d.isPrivate) {
         // Remove existing if editing
@@ -1059,11 +1084,46 @@
     }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
        h('option', { value: 'light', selected: S.settings.theme === 'light', text: 'Light' }));
 
+    const passwordInput = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password' });
+    const adminStatus = h('p', {
+      class: 'muted',
+      text: sudoMode ? 'Admin mode is unlocked for this tab.' : 'Enter the admin password to edit or delete any stuti.'
+    });
+    const adminButton = btn(sudoMode ? 'Lock admin mode' : 'Unlock admin mode', () => {
+      if (sudoMode) {
+        sudoMode = false;
+        passwordInput.value = '';
+        adminStatus.textContent = 'Admin mode is locked.';
+        adminButton.textContent = 'Unlock admin mode';
+        toast('Admin mode locked');
+        return;
+      }
+      if (passwordInput.value !== ADMIN_PASSPHRASE) {
+        passwordInput.value = '';
+        passwordInput.focus();
+        return toast('Incorrect password');
+      }
+      sudoMode = true;
+      passwordInput.value = '';
+      adminStatus.textContent = 'Admin mode is unlocked for this tab.';
+      adminButton.textContent = 'Lock admin mode';
+      toast('Admin mode unlocked');
+    }, 'primary');
+    passwordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') adminButton.click();
+    });
+
     app.append(h('div', { class: 'screen' },
       h('h1', { text: 'Settings' }),
       h('section', { class: 'card' },
         h('h2', { text: 'Appearance' }),
-        h('label', { text: 'Theme' }), themeSel)));
+        h('label', { text: 'Theme' }), themeSel),
+      h('section', { class: 'card' },
+        h('h2', { text: 'Admin mode' }),
+        adminStatus,
+        h('label', { text: 'Password' }), passwordInput,
+        h('div', { class: 'row', style: 'margin-top:12px' }, adminButton),
+        h('p', { class: 'muted', text: 'This passphrase is part of the app code and is not a secure authentication system.' }))));
   }
 
   // Initial immediate route render so app opens with zero delay, then init cloud
