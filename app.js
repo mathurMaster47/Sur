@@ -141,7 +141,8 @@
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         fetchCloudStutis();
 
-        checkImportLink();
+        // Check for share link after a short delay to ensure cloud is ready
+        setTimeout(() => checkImportLink(), 100);
 
         supabaseClient
           .channel('public:stutis')
@@ -182,37 +183,58 @@
     }
   }
 
-  function checkImportLink() {
+  async function checkImportLink() {
     const params = new URLSearchParams(window.location.search);
-    const sharedData = params.get('share');
-    if (sharedData) {
+    const shareId = params.get('share');
+    if (shareId && supabaseClient) {
       try {
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
-        if (decoded && decoded.title && decoded.pages) {
-          // Always import as private local copy to avoid conflicts
-          const imported = clone(decoded);
-          imported.id = uid(); // Generate new ID to avoid conflicts
-          imported.isPrivate = true;
-          imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
-          
-          S.customStutis.push(imported);
-          S.stutis.push(imported);
-          saveLocal();
-          toast(`Imported "${decoded.title}" into your library!`);
-          
-          // Clear the share parameter from URL
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+        toast('Loading shared stuti...');
+        const { data, error } = await supabaseClient
+          .from('stutis')
+          .select('*')
+          .eq('id', shareId)
+          .single();
+        
+        if (error || !data) {
+          toast('Could not find shared stuti');
+          return;
         }
+        
+        const sharedStuti = {
+          id: data.id,
+          title: data.title,
+          deity: data.deity || '',
+          category: data.category || 'stuti',
+          lang: data.language || 'hi',
+          authorName: data.author_name || 'Anonymous',
+          pages: data.pages || [],
+          isPrivate: false
+        };
+        
+        // Import as private local copy
+        const imported = clone(sharedStuti);
+        imported.id = uid(); // Generate new ID
+        imported.isPrivate = true;
+        imported.collectionId = S.collections.find((c) => !c.builtin)?.id || S.collections[0].id;
+        
+        S.customStutis.push(imported);
+        S.stutis.push(imported);
+        saveLocal();
+        toast(`Imported "${sharedStuti.title}" into your library!`);
+        
+        // Clear the share parameter from URL
+        window.history.replaceState({}, document.title, window.location.pathname + '#/library');
+        route();
       } catch (e) {
-        console.error('Invalid share link:', e);
+        console.error('Import error:', e);
         toast('Could not import from share link');
       }
     }
   }
 
   function generateShareLink(stuti) {
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(stuti))));
-    return `${window.location.origin}${window.location.pathname}?share=${encoded}#/`;
+    // Use the stuti ID as the share parameter - much shorter link
+    return `${window.location.origin}${window.location.pathname}?share=${stuti.id}#/library`;
   }
 
   function cleanPath() {
@@ -482,8 +504,10 @@
         
         if (!s.isPrivate) {
           buttons.push(h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
-            navigator.clipboard.writeText(shareUrl);
-            toast('Share link copied to clipboard!');
+            if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
+              navigator.clipboard.writeText(shareUrl);
+              toast('Share link copied to clipboard!');
+            }
           }}));
         }
         
@@ -516,8 +540,10 @@
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
         !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share', onclick: () => {
-          navigator.clipboard.writeText(shareUrl);
-          toast('Share link copied to clipboard!');
+          if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
+            navigator.clipboard.writeText(shareUrl);
+            toast('Share link copied to clipboard!');
+          }
         }}) : null
       ];
       
@@ -782,7 +808,7 @@
       // Only show share link for public stutis
       if (!d.isPrivate) {
         const shareUrl = generateShareLink(rec);
-        if (confirm('Stuti created! Copy share link to clipboard?')) {
+        if (confirm(`Stuti created!\n\nShare link:\n${shareUrl}\n\nCopy to clipboard?`)) {
           navigator.clipboard.writeText(shareUrl);
           toast('Link copied to clipboard!');
         }
