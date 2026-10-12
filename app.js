@@ -751,7 +751,6 @@
       h('div', { class: 'row between' }, h('h1', { text: 'Library' }), 
         h('div', { class: 'row' },
           btn('+ Collection', showCreateCollectionDialog, 'small ghost'),
-          btn('Restore from Google', () => restoreFromGoogle(), 'small ghost'),
           link('+ Add stuti', '#/add', 'primary'))),
       q, categoryFilter, list));
     draw();
