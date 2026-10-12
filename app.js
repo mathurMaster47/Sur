@@ -613,7 +613,22 @@
       S.stutis.forEach(s => {
         const shareUrl = generateShareLink(s);
         const buttons = [
-          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary')
+          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary'),
+          h('button', { class: 'btn small', type: 'button', text: ' Copy', onclick: () => {
+            const copy = clone(s);
+            copy.id = uid();
+            copy.isPrivate = true;
+            copy.collectionId = ensureArray(copy.collectionId).filter(id => id !== 'cloud-collection');
+            if (!copy.collectionId.length) {
+              const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
+              copy.collectionId = [mine.id];
+            }
+            S.customStutis.push(copy);
+            S.stutis.push(copy);
+            saveLocal();
+            toast('Copied to your library');
+            draw();
+          }})
         ];
         
         if (!s.isPrivate) {
@@ -685,6 +700,21 @@
       
       const buttons = [
         link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
+        h('button', { class: 'btn small', type: 'button', text: ' Copy', onclick: () => {
+          const copy = clone(x);
+          copy.id = uid();
+          copy.isPrivate = true;
+          copy.collectionId = ensureArray(copy.collectionId).filter(id => id !== 'cloud-collection');
+          if (!copy.collectionId.length) {
+            const mine = S.collections.find((c) => !c.builtin) || S.collections[0];
+            copy.collectionId = [mine.id];
+          }
+          S.customStutis.push(copy);
+          S.stutis.push(copy);
+          saveLocal();
+          toast('Copied to your library');
+          draw();
+        }}),
         !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
           if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
             navigator.clipboard.writeText(shareUrl);
