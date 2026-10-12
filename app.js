@@ -5,7 +5,7 @@
   'use strict';
 
   /* ---------- constants ---------- */
-  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzltbjBQxM-1_xLg30P1TNgKJPLf135MkUmLhl6WlUfWod1wQIJXCYry1iCM-xFX6Pr/exec';
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz87a8_r-1bFZLQLLfkcg2fDDr0fqwsF3OT-uQa6rvX9jftReBvpxIhwmnZnnhHW__C/exec';
 
   const KEY = 'sur.v1';
   const CLOUD_COLLECTION_ID = 'cloud-collection';
