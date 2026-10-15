@@ -19,7 +19,6 @@
   const OCR = { hi: 'hin', sa: 'san', mr: 'mar', gu: 'guj', pa: 'pan', ne: 'nep', bn: 'ben', as: 'asm', or: 'ori', raj: 'hin', bho: 'hin', mai: 'hin' };
   const RULES = { raj: 'hi', bho: 'hi', mai: 'hi' };
   const CATEGORIES = [['stuti', 'Stuti'], ['aarti', 'Aarti'], ['chalisa', 'Chalisa'], ['bhajan', 'Bhajan'], ['mantra', 'Mantra'], ['other', 'Other']];
-  const categoryName = (category) => (CATEGORIES.find(([id]) => id === category) || [category, category])[1];
   const ADMIN_PASSPHRASE = 'pspspspsps';
 
   const UI_LANGS = [
@@ -181,6 +180,89 @@
   const t = (key) => {
     const lang = S.settings.uiLang || 'en';
     return TRANSLATIONS[lang][key] || TRANSLATIONS.en[key] || key;
+  };
+
+  // Simple translation function for user-created content
+  async function translateText(text, targetLang) {
+    if (!text || targetLang === 'en') return text;
+    
+    // For known terms, use our dictionary
+    const knownTranslations = {
+      'Stuti': 'स्तुति',
+      'Aarti': 'आरती',
+      'Chalisa': 'चालीसा',
+      'Bhajan': 'भजन',
+      'Mantra': 'मंत्र',
+      'Hindi': 'हिन्दी',
+      'Sanskrit': 'संस्कृत',
+      'English': 'अंग्रेजी',
+      'Marathi': 'मराठी',
+      'Gujarati': 'गुजराती',
+      'Punjabi': 'पंजाबी',
+      'Bengali': 'बांग्ला',
+      'Nepali': 'नेपाली',
+      'Ganesh Ji': 'गणेश जी',
+      'Navratri Stuti': 'नवरात्रि स्तुति',
+      'Raj Bhog': 'राज भोग',
+      'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
+      'My Stutis': 'मेरी स्तुतियाँ',
+      'By': 'द्वारा',
+      'page': 'पेज',
+      'pages': 'पेज'
+    };
+    
+    if (knownTranslations[text]) {
+      return knownTranslations[text];
+    }
+    
+    // Try to translate using Google Translate (unofficial API)
+    try {
+      const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`);
+      const data = await response.json();
+      if (data && data[0] && data[0][0] && data[0][0][0]) {
+        return data[0][0][0];
+      }
+    } catch (e) {
+      console.warn('Translation failed:', e);
+    }
+    
+    return text;
+  }
+
+  // Synchronous translation for display (uses cache or returns original)
+  const translateDisplay = (text) => {
+    if (S.settings.uiLang === 'en') return text;
+    
+    const knownTranslations = {
+      'Stuti': 'स्तुति',
+      'Aarti': 'आरती',
+      'Chalisa': 'चालीसा',
+      'Bhajan': 'भजन',
+      'Mantra': 'मंत्र',
+      'Hindi': 'हिन्दी',
+      'Sanskrit': 'संस्कृत',
+      'English': 'अंग्रेजी',
+      'Marathi': 'मराठी',
+      'Gujarati': 'गुजराती',
+      'Punjabi': 'पंजाबी',
+      'Bengali': 'बांग्ला',
+      'Nepali': 'नेपाली',
+      'Ganesh Ji': 'गणेश जी',
+      'Navratri Stuti': 'नवरात्रि स्तुति',
+      'Raj Bhog': 'राज भोग',
+      'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
+      'My Stutis': 'मेरी स्तुतियाँ',
+      'By': 'द्वारा',
+      'page': 'पेज',
+      'pages': 'पेज'
+    };
+    
+    return knownTranslations[text] || text;
+  };
+
+  const categoryName = (category) => {
+    const name = (CATEGORIES.find(([id]) => id === category) || [category, category])[1];
+    return translateDisplay(name);
   };
 
   /* ---------- helpers ---------- */
@@ -512,7 +594,10 @@
       S.collections.push({ id: CLOUD_COLLECTION_ID, name: 'Cloud Community Library', builtin: false });
     }
   }
-  const langName = (c) => (LANGS.find((l) => l[0] === c) || [c, c])[1];
+  const langName = (c) => {
+    const lang = (LANGS.find((l) => l[0] === c) || [c, c])[1];
+    return translateDisplay(lang);
+  };
   function buildQueue() {
     const q = [];
     for (const st of S.path) {
@@ -576,12 +661,12 @@
   function stepInfo(step) {
     if (step.type === 'collection') {
       const c = colOf(step.id);
-      return c ? { name: c.name, sub: `${t('wholeCollectionDesc').replace('{}', stutisIn(c.id).length)}` } : null;
+      return c ? { name: translateDisplay(c.name), sub: `${t('wholeCollectionDesc').replace('{}', stutisIn(c.id).length)}` } : null;
     }
     const x = stutiOf(step.id);
     if (!x) return null;
-    const names = collectionsOf(x).map((c) => c.name).join(', ');
-    return { name: x.title, sub: `${names ? names + ' · ' : ''}${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` };
+    const names = collectionsOf(x).map((c) => translateDisplay(c.name)).join(', ');
+    return { name: translateDisplay(x.title), sub: `${names ? names + ' · ' : ''}${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` };
   }
 
   function viewHome(app) {
@@ -815,7 +900,7 @@
         
         list.append(h('div', { class: 'item' },
           h('div', { class: 'name' },
-            h('b', { text: s.title }),
+            h('b', { text: translateDisplay(s.title) }),
             h('span', { class: 'muted', text: `${langName(s.lang)} · ${s.pages.length} ${s.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
           ...buttons));
       });
@@ -928,7 +1013,7 @@
       
       return h('div', { class: 'item' },
         h('div', { class: 'name' },
-          h('b', { text: x.title }),
+          h('b', { text: translateDisplay(x.title) }),
           h('span', { class: 'muted', text: `${categoryName(x.category || 'stuti')} · ${langName(x.lang)} · ${authorText}${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
         ...buttons.filter(Boolean));
     }
@@ -942,7 +1027,7 @@
         if (term) items = items.filter((s) => (s.title + ' ' + s.deity + ' ' + categoryName(s.category || 'stuti') + ' ' + s.pages.map((p) => p.text).join(' ')).toLowerCase().includes(term));
         if ((term || category) && !items.length) return;
         list.append(h('section', { class: 'card' },
-          h('div', { class: 'row between' }, h('h3', { text: c.name }),
+          h('div', { class: 'row between' }, h('h3', { text: translateDisplay(c.name) }),
             (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
               onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast('Added to your Sur'); } })),
           items.length ? items.map(row) : h('p', { class: 'muted', text: t('noStutis') })));
