@@ -58,6 +58,7 @@
       category: 'Category',
       deity: 'Deity',
       title: 'Title',
+      theme: 'Theme',
       private: 'Private',
       public: 'Public',
       publisherName: 'Publisher name',
@@ -79,6 +80,7 @@
       dark: 'Dark',
       light: 'Light',
       settings: 'Settings',
+      theme: 'Theme',
       createCollection: '+ Collection',
       enterCollectionName: 'Enter collection name',
       wholeCollection: '+ Whole collection',
@@ -87,7 +89,18 @@
       pages_plural: 'pages',
       by: 'By',
       deleteConfirm: 'Delete this stuti?',
-      addFirst: 'Add something first'
+      addFirst: 'Add something first',
+      stuti: 'stuti',
+      of: 'of',
+      home: 'Home',
+      libraryTitle: 'Library',
+      selectTitle: 'Select what to read',
+      addTitle: 'Add new stuti',
+      editTitle: 'Edit stuti',
+      settingsTitle: 'Settings',
+      pageLabel: 'Page',
+      resume: 'Continue',
+      collections: 'Collections'
     },
     hi: {
       start: 'शुरू',
@@ -119,6 +132,7 @@
       category: 'श्रेणी',
       deity: 'देवता',
       title: 'शीर्षक',
+      theme: 'थीम',
       private: 'निजी',
       public: 'सार्वजनिक',
       publisherName: 'प्रकाशक का नाम',
@@ -140,6 +154,7 @@
       dark: 'अंधेरा',
       light: 'रोशनी',
       settings: 'सेटिंग्स',
+      theme: 'थीम',
       createCollection: '+ संग्रह',
       enterCollectionName: 'संग्रह का नाम दर्ज करें',
       wholeCollection: '+ पूरा संग्रह',
@@ -148,7 +163,18 @@
       pages_plural: 'पेज',
       by: 'द्वारा',
       deleteConfirm: 'इस स्तुति को हटाएं?',
-      addFirst: 'पहले कुछ जोड़ें'
+      addFirst: 'पहले कुछ जोड़ें',
+      stuti: 'स्तुति',
+      of: 'में से',
+      home: 'होम',
+      libraryTitle: 'लाइब्रेरी',
+      selectTitle: 'पढ़ने के लिए चुनें',
+      addTitle: 'नई स्तुति जोड़ें',
+      editTitle: 'स्तुति संपादित करें',
+      settingsTitle: 'सेटिंग्स',
+      pageLabel: 'पेज',
+      resume: 'जारी रखें',
+      collections: 'संग्रह'
     }
   };
 
@@ -499,6 +525,15 @@
   const romanOf = (st, pg) => (pg.translit ? pg.translit : autoRoman(pg.text, st.lang));
   function applyTheme() { document.documentElement.dataset.theme = S.settings.theme; }
 
+  function renderLangToggle() {
+    return h('div', { class: 'lang-toggle' },
+      h('button', { class: 'btn small ghost', type: 'button', onclick: () => {
+        S.settings.uiLang = S.settings.uiLang === 'en' ? 'hi' : 'en';
+        saveLocal();
+        window.location.reload();
+      }, text: S.settings.uiLang === 'en' ? 'अ' : 'A' }));
+  }
+
   /* ---------- router ---------- */
   let cleanups = [];
   let sudoMode = false;
@@ -541,12 +576,12 @@
   function stepInfo(step) {
     if (step.type === 'collection') {
       const c = colOf(step.id);
-      return c ? { name: c.name, sub: `Whole collection · ${stutisIn(c.id).length} stutis` } : null;
+      return c ? { name: c.name, sub: `${t('wholeCollectionDesc').replace('{}', stutisIn(c.id).length)}` } : null;
     }
     const x = stutiOf(step.id);
     if (!x) return null;
     const names = collectionsOf(x).map((c) => c.name).join(', ');
-    return { name: x.title, sub: `${names ? names + ' · ' : ''}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` };
+    return { name: x.title, sub: `${names ? names + ' · ' : ''}${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` };
   }
 
   function viewHome(app) {
@@ -555,13 +590,8 @@
     const pages = q.reduce((a, s) => a + s.pages.length, 0);
     const hasPos = S.pos && q.some((x) => x.id === S.pos.sid);
     
-    const langToggle = h('select', { class: 'btn small ghost', onchange: (e) => {
-      S.settings.uiLang = e.target.value;
-      saveLocal();
-      window.location.reload();
-    } }, UI_LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === (S.settings.uiLang || 'en'), text: nat })));
-    
     app.append(h('div', { class: 'screen' },
+      renderLangToggle(),
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
         h('p', { class: 'muted', text: t('yourPrayers') })),
@@ -571,16 +601,15 @@
           const i = stepInfo(st);
           return i ? h('li', null, h('div', { class: 'name' }, h('b', { text: i.name }), h('span', { class: 'muted', text: i.sub || '' }))) : null;
         })),
-        h('p', { class: 'muted', text: `${q.length} stutis · ${pages} pages` }),
+        h('p', { class: 'muted', text: `${q.length} ${t('stuti')} · ${pages} ${pages === 1 ? t('pages') : t('pages_plural')}` }),
         h('div', { class: 'row' },
           link(t('start'), '#/read', 'primary'),
-          hasPos ? link('Continue', '#/read?resume=1') : null,
+          hasPos ? link(t('resume'), '#/read?resume=1') : null,
           link(t('edit'), '#/path', 'ghost'))),
       h('section', { class: 'card' },
         h('h2', { text: t('quickRead') }),
         h('p', { class: 'muted', text: t('quickReadDesc') }),
-        link(t('selectRead'), '#/select', 'primary')),
-      h('div', { class: 'row', style: 'justify-content:center; margin-top:20px' }, langToggle)));
+        link(t('selectRead'), '#/select', 'primary'))));
   }
 
   /* ---------- Path builder ---------- */
@@ -588,12 +617,6 @@
     const seqBox = h('section', { class: 'card' });
     const addBox = h('section', { class: 'card' });
     const startRow = h('div', { class: 'row' });
-
-    const langToggle = h('select', { class: 'btn small ghost', onchange: (e) => {
-      S.settings.uiLang = e.target.value;
-      saveLocal();
-      window.location.reload();
-    } }, UI_LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === (S.settings.uiLang || 'en'), text: nat })));
 
     function renderSeq() {
       seqBox.replaceChildren(h('h2', { text: t('yourSequence') }));
@@ -648,9 +671,10 @@
     }
 
     app.append(h('div', { class: 'screen' },
+      renderLangToggle(),
       welcome ? h('div', { class: 'hero' }, h('div', { class: 'logo', text: 'सुर' })) : null,
       h('h1', { text: welcome ? t('buildSur') : t('editSur') }),
-      seqBox, startRow, addBox, h('div', { class: 'row', style: 'justify-content:center; margin-top:20px' }, langToggle)));
+      seqBox, startRow, addBox));
     renderSeq(); renderAdd();
   }
 
@@ -659,7 +683,7 @@
     const single = params.get('s');
     const queue = single ? [stutiOf(single)].filter(Boolean) : buildQueue();
     if (!queue.length) {
-      app.append(h('div', { class: 'screen' }, h('h1', { text: 'Nothing to read yet' }), link('Build your Sur', '#/path', 'primary')));
+      app.append(h('div', { class: 'screen' }, renderLangToggle(), h('h1', { text: t('nothingToRead') }), link(t('buildSur'), '#/path', 'primary')));
       return;
     }
     document.body.classList.add('reading');
@@ -671,20 +695,21 @@
     const fill = h('i');
     const stage = h('main', { class: 'stage' });
     const pageLabel = h('span', { class: 'muted' });
-    const prevBtn = h('button', { class: 'btn', type: 'button', text: '◀ Back', onclick: () => prev() });
-    const nextBtn = h('button', { class: 'btn primary', type: 'button', text: 'Next ▶', onclick: () => next() });
+    const prevBtn = h('button', { class: 'btn', type: 'button', text: '◀ ' + t('back'), onclick: () => prev() });
+    const nextBtn = h('button', { class: 'btn primary', type: 'button', text: t('next') + ' ▶', onclick: () => next() });
     const viewSeg = h('div', { class: 'seg' });
 
     function renderSeg() {
-      viewSeg.replaceChildren(...[['orig', 'Original'], ['roman', 'English'], ['both', 'Both']].map(([k, l]) =>
+      viewSeg.replaceChildren(...[['orig', t('original')], ['roman', t('english')], ['both', t('both')]].map(([k, l]) =>
         h('button', { type: 'button', class: S.settings.view === k ? 'on' : '', text: l, onclick: () => { S.settings.view = k; saveLocal(); renderSeg(); draw(); } })));
     }
     const setSize = (d) => { S.settings.size = Math.max(14, Math.min(48, S.settings.size + d)); saveLocal(); draw(); };
 
     const topbar = h('div', { class: 'topbar' },
       h('div', { class: 'row between' },
-        h('a', { class: 'btn small ghost', href: single ? '#/library' : '#/', text: '✕ Close' }),
+        h('a', { class: 'btn small ghost', href: single ? '#/library' : '#/', text: '✕ ' + t('close') }),
         h('div', { class: 'row' },
+          renderLangToggle(),
           h('button', { class: 'btn small', type: 'button', text: 'A−', onclick: () => setSize(-2) }),
           h('button', { class: 'btn small', type: 'button', text: 'A+', onclick: () => setSize(2) }),
           h('button', { class: 'btn small', type: 'button', text: S.settings.theme === 'dark' ? '☀' : '☾',
@@ -713,25 +738,25 @@
     function draw() {
       stage.replaceChildren();
       if (done) {
-        stage.append(h('div', { class: 'done' }, h('h2', { text: 'Completed ' }),
+        stage.append(h('div', { class: 'done' }, h('h2', { text: t('completed') }),
           h('div', { class: 'row', style: 'justify-content:center' },
-            btn('Start again', () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'),
-            link('Choose another', '#/select', 'ghost'),
-            link('Home', '#/', 'ghost'))));
-        fill.style.width = '100%'; titleEl.textContent = 'Completed'; subEl.textContent = '';
+            btn(t('startAgain'), () => { qi = 0; pi = 0; done = false; draw(); }, 'primary'),
+            link(t('chooseAnother'), '#/select', 'ghost'),
+            link(t('home'), '#/', 'ghost'))));
+        fill.style.width = '100%'; titleEl.textContent = t('completed'); subEl.textContent = '';
         pageLabel.textContent = ''; nextBtn.disabled = true; prevBtn.disabled = false;
         return;
       }
       const st = queue[qi], pg = st.pages[pi];
       const collections = collectionsOf(st);
       titleEl.textContent = st.title;
-      subEl.textContent = `${collections.length ? collections.map((c) => c.name).join(', ') + ' · ' : ''}stuti ${qi + 1}/${queue.length}`;
-      pageLabel.textContent = `Page ${pi + 1}/${st.pages.length}`;
+      subEl.textContent = `${collections.length ? collections.map((c) => c.name).join(', ') + ' · ' : ''}${t('stuti')} ${qi + 1} ${t('of')} ${queue.length}`;
+      pageLabel.textContent = `${t('pageLabel')} ${pi + 1}/${st.pages.length}`;
       const before = queue.slice(0, qi).reduce((a, s) => a + s.pages.length, 0) + pi + 1;
       fill.style.width = (before / total * 100) + '%';
       prevBtn.disabled = qi === 0 && pi === 0;
       nextBtn.disabled = false;
-      nextBtn.textContent = (qi === queue.length - 1 && pi === st.pages.length - 1) ? 'Finish ✓' : 'Next ▶';
+      nextBtn.textContent = (qi === queue.length - 1 && pi === st.pages.length - 1) ? t('completed') + ' ✓' : t('next') + ' ▶';
       stage.append(pageContent(st, pg));
     }
     function next() {
@@ -761,8 +786,8 @@
       S.stutis.forEach(s => {
         const shareUrl = generateShareLink(s);
         const buttons = [
-          link('Read', '#/read?s=' + encodeURIComponent(s.id), 'small primary'),
-          h('button', { class: 'btn small', type: 'button', text: ' Copy', onclick: () => {
+          link(t('read'), '#/read?s=' + encodeURIComponent(s.id), 'small primary'),
+          h('button', { class: 'btn small', type: 'button', text: ' ' + t('copy'), onclick: () => {
             const copy = clone(s);
             copy.id = uid();
             copy.isPrivate = true;
@@ -780,7 +805,7 @@
         ];
         
         if (!s.isPrivate) {
-          buttons.push(h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
+          buttons.push(h('button', { class: 'btn small', type: 'button', text: ' ' + t('shareLink'), onclick: () => {
             if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
               navigator.clipboard.writeText(shareUrl);
               toast('Share link copied to clipboard!');
@@ -791,37 +816,38 @@
         list.append(h('div', { class: 'item' },
           h('div', { class: 'name' },
             h('b', { text: s.title }),
-            h('span', { class: 'muted', text: `${langName(s.lang)} · ${s.pages.length} page${s.pages.length > 1 ? 's' : ''}` })),
+            h('span', { class: 'muted', text: `${langName(s.lang)} · ${s.pages.length} ${s.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
           ...buttons));
       });
     }
     
     app.append(h('div', { class: 'screen' },
+      renderLangToggle(),
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
-        h('p', { class: 'muted', text: 'What would you like to read today?' })),
+        h('p', { class: 'muted', text: t('quickReadDesc') })),
       list));
     draw();
   }
 
   /* ---------- Library ---------- */
   function viewLibrary(app) {
-    const q = h('input', { type: 'search', placeholder: 'Search title, deity or text…' });
+    const q = h('input', { type: 'search', placeholder: t('search') });
     const categoryFilter = h('select', {},
-      h('option', { value: '', text: 'All categories' }),
+      h('option', { value: '', text: t('all') }),
       CATEGORIES.map(([id, name]) => h('option', { value: id, text: name })));
     const list = h('div');
     
     // Create new collection dialog
     function showCreateCollectionDialog() {
-      const nameInput = h('input', { type: 'text', placeholder: 'Collection name (e.g., Diwali Stuti)' });
+      const nameInput = h('input', { type: 'text', placeholder: t('enterCollectionName') });
       const dialog = h('div', { class: 'dialog', style: 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000' },
         h('div', { class: 'card', style: 'padding:20px;max-width:400px;width:90%' },
-          h('h2', { text: 'Create New Collection' }),
+          h('h2', { text: t('createCollection') }),
           nameInput,
           h('div', { class: 'row', style: 'margin-top:20px' },
-            btn('Cancel', () => dialog.remove(), 'ghost'),
-            btn('Create', () => {
+            btn(t('cancel'), () => dialog.remove(), 'ghost'),
+            btn(t('save'), () => {
               const name = nameInput.value.trim();
               if (!name) return toast('Please enter a collection name');
               if (S.collections.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
@@ -842,13 +868,13 @@
 
     function row(x) {
       const shareUrl = generateShareLink(x);
-      const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? 'By ' + x.authorName + ' · ' : '';
+      const authorText = (x.authorName && x.authorName !== 'Local User' && !x.isPrivate) ? t('by') + ' ' + x.authorName + ' · ' : '';
       const isFromCloud = ensureArray(x.collectionId).includes('cloud-collection');
       const isCustom = S.customStutis.some(s => s.id === x.id);
       
       const buttons = [
-        link('Read', '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
-        h('button', { class: 'btn small', type: 'button', text: ' Copy', onclick: () => {
+        link(t('read'), '#/read?s=' + encodeURIComponent(x.id), 'small primary'),
+        h('button', { class: 'btn small', type: 'button', text: ' ' + t('copy'), onclick: () => {
           const copy = clone(x);
           copy.id = uid();
           copy.isPrivate = true;
@@ -863,7 +889,7 @@
           toast('Copied to your library');
           draw();
         }}),
-        !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' Share Link', onclick: () => {
+        !x.isPrivate ? h('button', { class: 'btn small', type: 'button', text: ' ' + t('shareLink'), onclick: () => {
           if (confirm(`Share link:\n${shareUrl}\n\nCopy to clipboard?`)) {
             navigator.clipboard.writeText(shareUrl);
             toast('Share link copied to clipboard!');
@@ -872,14 +898,14 @@
       ];
 
       if (sudoMode || isCustom) {
-        buttons.push(link('Edit', '#/edit/' + encodeURIComponent(x.id), 'small'));
+        buttons.push(link(t('edit'), '#/edit/' + encodeURIComponent(x.id), 'small'));
       }
       
       if (!isFromCloud || sudoMode) {
-        buttons.push(h('button', { class: 'btn small danger', type: 'button', text: 'Delete', onclick: () => {
+        buttons.push(h('button', { class: 'btn small danger', type: 'button', text: t('delete'), onclick: () => {
           const confirmation = isFromCloud
             ? 'Hide this cloud stuti from this device? This will not delete its row from Google Sheets.'
-            : 'Delete this stuti? This cannot be undone.';
+            : t('deleteConfirm');
           if (confirm(confirmation)) {
             if (isCustom) {
               S.customStutis = S.customStutis.filter(s => s.id !== x.id);
@@ -903,7 +929,7 @@
       return h('div', { class: 'item' },
         h('div', { class: 'name' },
           h('b', { text: x.title }),
-          h('span', { class: 'muted', text: `${categoryName(x.category || 'stuti')} · ${langName(x.lang)} · ${authorText}${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+          h('span', { class: 'muted', text: `${categoryName(x.category || 'stuti')} · ${langName(x.lang)} · ${authorText}${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
         ...buttons.filter(Boolean));
     }
     function draw() {
@@ -917,19 +943,20 @@
         if ((term || category) && !items.length) return;
         list.append(h('section', { class: 'card' },
           h('div', { class: 'row between' }, h('h3', { text: c.name }),
-            (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: '+ Whole collection', disabled: !items.length,
+            (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
               onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast('Added to your Sur'); } })),
-          items.length ? items.map(row) : h('p', { class: 'muted', text: 'No stutis yet.' })));
+          items.length ? items.map(row) : h('p', { class: 'muted', text: t('noStutis') })));
       });
       if (!list.children.length) list.append(h('p', { class: 'muted', text: term || category ? 'No matches.' : 'No collections yet.' }));
     }
     q.addEventListener('input', draw);
     categoryFilter.addEventListener('change', draw);
     app.append(h('div', { class: 'screen' },
-      h('div', { class: 'row between' }, h('h1', { text: 'Library' }), 
+      renderLangToggle(),
+      h('div', { class: 'row between' }, h('h1', { text: t('libraryTitle') }), 
         h('div', { class: 'row' },
-          btn('+ Collection', showCreateCollectionDialog, 'small ghost'),
-          link('+ Add stuti', '#/add', 'primary'))),
+          btn(t('createCollection'), showCreateCollectionDialog, 'small ghost'),
+          link(t('addTitle'), '#/add', 'primary'))),
       q, categoryFilter, list));
     draw();
   }
@@ -958,9 +985,9 @@
     if (isAdminEditing && !isCloudItem && !isLocallyEditable) d.isPrivate = true;
 
     const pagesBox = h('div');
-    const titleIn = h('input', { type: 'text', placeholder: 'Name of the stuti', value: d.title, oninput: (e) => { d.title = e.target.value; } });
-    const deityIn = h('input', { type: 'text', placeholder: 'Deity name (optional)', value: d.deity || '', oninput: (e) => { d.deity = e.target.value; } });
-    const authorIn = h('input', { type: 'text', placeholder: 'Your Name (Publisher)', value: d.authorName, oninput: (e) => { d.authorName = e.target.value; } });
+    const titleIn = h('input', { type: 'text', placeholder: t('title'), value: d.title, oninput: (e) => { d.title = e.target.value; } });
+    const deityIn = h('input', { type: 'text', placeholder: t('deity') + ' (optional)', value: d.deity || '', oninput: (e) => { d.deity = e.target.value; } });
+    const authorIn = h('input', { type: 'text', placeholder: t('publisherName'), value: d.authorName, oninput: (e) => { d.authorName = e.target.value; } });
     
     const privacySel = h('select', {
       onchange: (e) => { 
@@ -968,8 +995,8 @@
         authorIn.style.display = d.isPrivate ? 'none' : 'block';
       }
     },
-      h('option', { value: 'public', selected: !d.isPrivate, text: ' Public (Publish to Cloud for everyone)' }),
-      h('option', { value: 'private', selected: d.isPrivate, text: ' Private (Keep on this device only)' })
+      h('option', { value: 'public', selected: !d.isPrivate, text: ' ' + t('public') + ' (Publish to Cloud for everyone)' }),
+      h('option', { value: 'private', selected: d.isPrivate, text: ' ' + t('private') + ' (Keep on this device only)' })
     );
 
     const catSel = h('select', { onchange: (e) => { d.category = e.target.value; } },
@@ -1092,14 +1119,14 @@
         });
         
         const card = h('div', { class: 'page-card' },
-          h('b', { text: `Page ${i + 1}` }),
+          h('b', { text: `${t('pageLabel')} ${i + 1}` }),
           h('div', { class: 'row' },
             btn('Camera', () => camInput.click(), 'small ghost'),
             btn('Upload Photo', () => fileInput.click(), 'small ghost')
           ),
-          h('label', { text: 'Original Text' }),
+          h('label', { text: t('original') + ' Text' }),
           textTa,
-          h('label', { text: 'Transliteration (editable)' }),
+          h('label', { text: t('english') + ' (editable)' }),
           translitTa
         );
         pagesBox.append(card);
@@ -1115,7 +1142,7 @@
       });
     }
 
-    const saveBtn = btn(existing ? 'Save changes' : 'Save Stuti', async () => {
+    const saveBtn = btn(existing ? t('save') : t('save'), async () => {
       // Get transliteration values from the textareas
       const translitTextareas = pagesBox.querySelectorAll('textarea:nth-of-type(2)');
       d.pages.forEach((pg, i) => {
@@ -1191,16 +1218,17 @@
     }, 'primary');
 
     app.append(h('div', { class: 'screen' },
-      h('h1', { text: existing ? 'Edit stuti' : 'Add a stuti' }),
-      h('label', { text: 'Title' }), titleIn,
-      h('label', { text: 'Deity (optional)' }), deityIn,
-      h('label', { text: 'Category' }), catSel,
-      h('label', { text: 'Collections (choose one or more)' }), collBox,
-      h('label', { text: 'Privacy Setting' }), privacySel,
-      h('label', { text: 'Publishing Author Name' }), authorIn,
-      h('label', { text: 'Language' }), langSel,
+      renderLangToggle(),
+      h('h1', { text: existing ? t('editTitle') : t('addTitle') }),
+      h('label', { text: t('title') }), titleIn,
+      h('label', { text: t('deity') + ' (optional)' }), deityIn,
+      h('label', { text: t('category') }), catSel,
+      h('label', { text: t('collections') }), collBox,
+      h('label', { text: t('private') + ' / ' + t('public') }), privacySel,
+      h('label', { text: t('publisherName') }), authorIn,
+      h('label', { text: t('language') }), langSel,
       pagesBox,
-      btn('+ Add page', () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
+      btn('+ ' + t('addPage'), () => { d.pages.push({ text: '', translit: null }); renderPages(); }, 'small'),
       h('div', { class: 'row', style: 'margin-top:20px' }, saveBtn),
       fileInput,
       camInput));
@@ -1215,10 +1243,10 @@
   function viewSettings(app) {
     const themeSel = h('select', {
       onchange: (e) => { S.settings.theme = e.target.value; saveLocal(); applyTheme(); }
-    }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: 'Dark' }),
-       h('option', { value: 'light', selected: S.settings.theme === 'light', text: 'Light' }));
+    }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: t('dark') }),
+       h('option', { value: 'light', selected: S.settings.theme === 'light', text: t('light') }));
 
-    const passwordInput = h('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Password' });
+    const passwordInput = h('input', { type: 'password', autocomplete: 'current-password', placeholder: t('settings') });
     const adminStatus = h('p', {
       class: 'muted',
       text: sudoMode ? 'Admin mode is unlocked for this tab.' : 'Enter the admin password to edit or delete any stuti.'
@@ -1248,14 +1276,15 @@
     });
 
     app.append(h('div', { class: 'screen' },
-      h('h1', { text: 'Settings' }),
+      renderLangToggle(),
+      h('h1', { text: t('settingsTitle') }),
       h('section', { class: 'card' },
         h('h2', { text: 'Appearance' }),
-        h('label', { text: 'Theme' }), themeSel),
+        h('label', { text: t('theme') }), themeSel),
       h('section', { class: 'card' },
         h('h2', { text: 'Admin mode' }),
         adminStatus,
-        h('label', { text: 'Password' }), passwordInput,
+        h('label', { text: t('settings') }), passwordInput,
         h('div', { class: 'row', style: 'margin-top:12px' }, adminButton),
         h('p', { class: 'muted', text: 'This passphrase is part of the app code and is not a secure authentication system.' }))));
   }
