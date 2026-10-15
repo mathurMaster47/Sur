@@ -38,6 +38,7 @@
       yourPrayers: 'Your prayers, in your order.',
       yourSequence: 'Your sequence',
       addToSequence: 'Add to your sequence',
+      addToSequenceDesc: 'Pick from whole collections or single stutis.',
       nothingYet: 'Nothing yet. Add items below.',
       writeNew: 'Write a new stuti',
       buildSur: 'Build your Sur',
@@ -53,6 +54,8 @@
       all: 'All',
       collections: 'Collections',
       noStutis: 'No stutis here yet.',
+      noMatches: 'No matches.',
+      noCollectionsYet: 'No collections yet.',
       language: 'Language',
       category: 'Category',
       deity: 'Deity',
@@ -60,6 +63,8 @@
       theme: 'Theme',
       private: 'Private',
       public: 'Public',
+      publicOption: 'Public (Publish to Cloud for everyone)',
+      privateOption: 'Private (Keep on this device only)',
       publisherName: 'Publisher name',
       save: 'Save',
       cancel: 'Cancel',
@@ -79,7 +84,6 @@
       dark: 'Dark',
       light: 'Light',
       settings: 'Settings',
-      theme: 'Theme',
       createCollection: '+ Collection',
       enterCollectionName: 'Enter collection name',
       wholeCollection: '+ Whole collection',
@@ -99,7 +103,27 @@
       settingsTitle: 'Settings',
       pageLabel: 'Page',
       resume: 'Continue',
-      collections: 'Collections'
+      appearance: 'Appearance',
+      adminMode: 'Admin mode',
+      adminPassword: 'Enter admin password',
+      adminUnlocked: 'Admin mode is unlocked for this tab.',
+      adminLocked: 'Enter the admin password to edit or delete any stuti.',
+      lockAdmin: 'Lock admin mode',
+      unlockAdmin: 'Unlock admin mode',
+      adminNote: 'This passphrase is part of the app code and is not a secure authentication system.',
+      camera: 'Camera',
+      uploadPhoto: 'Upload Photo',
+      cropImage: 'Crop Image',
+      cropExtract: 'Crop & Extract Text',
+      typePageContent: 'Type page content…',
+      englishTranslitPlaceholder: 'English transliteration (auto-generated, editable)',
+      textLabel: 'Text',
+      editable: 'editable',
+      addedToSur: 'Added to your Sur',
+      copiedToLibrary: 'Copied to your library',
+      pleaseAddTitle: 'Please add a title',
+      addAtLeastOnePage: 'Add at least one page',
+      pleaseEnterAuthor: 'Please enter your name for publishing'
     },
     hi: {
       start: 'शुरू',
@@ -112,6 +136,7 @@
       yourPrayers: 'आपकी प्रार्थनाएं, आपके क्रम में।',
       yourSequence: 'आपका क्रम',
       addToSequence: 'अपने क्रम में जोड़ें',
+      addToSequenceDesc: 'पूरे संग्रह या किसी एक स्तुति से चुनें।',
       nothingYet: 'अभी कुछ नहीं। नीचे से आइटम जोड़ें।',
       writeNew: '+ नई स्तुति लिखें',
       buildSur: 'अपना सुर बनाएं',
@@ -127,6 +152,8 @@
       all: 'सभी',
       collections: 'संग्रह',
       noStutis: 'यहां अभी कोई स्तुति नहीं है।',
+      noMatches: 'कोई परिणाम नहीं मिला।',
+      noCollectionsYet: 'अभी कोई संग्रह नहीं है।',
       language: 'भाषा',
       category: 'श्रेणी',
       deity: 'देवता',
@@ -134,6 +161,8 @@
       theme: 'थीम',
       private: 'निजी',
       public: 'सार्वजनिक',
+      publicOption: 'सार्वजनिक (सभी के लिए क्लाउड पर प्रकाशित करें)',
+      privateOption: 'निजी (केवल इसी डिवाइस पर रखें)',
       publisherName: 'प्रकाशक का नाम',
       save: 'सहेजें',
       cancel: 'रद्द करें',
@@ -153,7 +182,6 @@
       dark: 'अंधेरा',
       light: 'रोशनी',
       settings: 'सेटिंग्स',
-      theme: 'थीम',
       createCollection: '+ संग्रह',
       enterCollectionName: 'संग्रह का नाम दर्ज करें',
       wholeCollection: '+ पूरा संग्रह',
@@ -173,7 +201,27 @@
       settingsTitle: 'सेटिंग्स',
       pageLabel: 'पेज',
       resume: 'जारी रखें',
-      collections: 'संग्रह'
+      appearance: 'दिखावट',
+      adminMode: 'व्यवस्थापक मोड',
+      adminPassword: 'व्यवस्थापक पासवर्ड दर्ज करें',
+      adminUnlocked: 'इस टैब के लिए व्यवस्थापक मोड खुला है।',
+      adminLocked: 'किसी भी स्तुति को संपादित या हटाने के लिए व्यवस्थापक पासवर्ड दर्ज करें।',
+      lockAdmin: 'व्यवस्थापक मोड लॉक करें',
+      unlockAdmin: 'व्यवस्थापक मोड अनलॉक करें',
+      adminNote: 'यह पासफ़्रेज़ ऐप कोड का हिस्सा है और सुरक्षित प्रमाणीकरण प्रणाली नहीं है।',
+      camera: 'कैमरा',
+      uploadPhoto: 'फोटो अपलोड करें',
+      cropImage: 'फोटो क्रॉप करें',
+      cropExtract: 'क्रॉप करें और टेक्स्ट निकालें',
+      typePageContent: 'पेज का पाठ यहाँ लिखें…',
+      englishTranslitPlaceholder: 'अंग्रेजी लिप्यंतरण (स्वतः जनरेट, संपादन योग्य)',
+      textLabel: 'पाठ',
+      editable: 'संपादन योग्य',
+      addedToSur: 'आपके सुर में जोड़ा गया',
+      copiedToLibrary: 'आपकी लाइब्रेरी में कॉपी किया गया',
+      pleaseAddTitle: 'कृपया एक शीर्षक दर्ज करें',
+      addAtLeastOnePage: 'कम से कम एक पेज जोड़ें',
+      pleaseEnterAuthor: 'प्रकाशन के लिए अपना नाम दर्ज करें'
     }
   };
 
@@ -182,38 +230,67 @@
     return TRANSLATIONS[lang][key] || TRANSLATIONS.en[key] || key;
   };
 
+  const KNOWN_TRANSLATIONS = {
+    'Stuti': 'स्तुति',
+    'Aarti': 'आरती',
+    'Chalisa': 'चालीसा',
+    'Bhajan': 'भजन',
+    'Mantra': 'मंत्र',
+    'Other': 'अन्य',
+    'Hindi': 'हिन्दी',
+    'Sanskrit': 'संस्कृत',
+    'English': 'अंग्रेजी',
+    'Marathi': 'मराठी',
+    'Gujarati': 'गुजराती',
+    'Punjabi': 'पंजाबी',
+    'Bengali': 'बांग्ला',
+    'Nepali': 'नेपाली',
+    'Assamese': 'असमिया',
+    'Odia': 'ओडिया',
+    'Rajasthani': 'राजस्थानी',
+    'Bhojpuri': 'भोजपुरी',
+    'Maithili': 'मैथिली',
+    'Ganesh Ji': 'गणेश जी',
+    'Navratri Stuti': 'नवरात्रि स्तुति',
+    'Raj Bhog': 'राज भोग',
+    'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
+    'My Stutis': 'मेरी स्तुतियाँ',
+    'By': 'द्वारा',
+    'page': 'पेज',
+    'pages': 'पेज',
+    'स्तुति': 'Stuti',
+    'आरती': 'Aarti',
+    'चालीसा': 'Chalisa',
+    'भजन': 'Bhajan',
+    'मंत्र': 'Mantra',
+    'अन्य': 'Other',
+    'हिन्दी': 'Hindi',
+    'संस्कृत': 'Sanskrit',
+    'अंग्रेजी': 'English',
+    'मराठी': 'Marathi',
+    'गुजराती': 'Gujarati',
+    'पंजाबी': 'Punjabi',
+    'बांग्ला': 'Bengali',
+    'नेपाली': 'Nepali',
+    'असमिया': 'Assamese',
+    'असमीया': 'Assamese',
+    'ओडिया': 'Odia',
+    'राजस्थानी': 'Rajasthani',
+    'भोजपुरी': 'Bhojpuri',
+    'मैथिली': 'Maithili',
+    'गणेश जी': 'Ganesh Ji',
+    'नवरात्रि स्तुति': 'Navratri Stuti',
+    'राज भोग': 'Raj Bhog',
+    'क्लाउड कम्युनिटी लाइब्रेरी': 'Cloud Community Library',
+    'मेरी स्तुतियाँ': 'My Stutis',
+    'द्वारा': 'By',
+    'पेज': 'page'
+  };
+
   // Simple translation function for user-created content
   async function translateText(text, targetLang) {
     if (!text || targetLang === 'en') return text;
-    
-    // For known terms, use our dictionary
-    const knownTranslations = {
-      'Stuti': 'स्तुति',
-      'Aarti': 'आरती',
-      'Chalisa': 'चालीसा',
-      'Bhajan': 'भजन',
-      'Mantra': 'मंत्र',
-      'Hindi': 'हिन्दी',
-      'Sanskrit': 'संस्कृत',
-      'English': 'अंग्रेजी',
-      'Marathi': 'मराठी',
-      'Gujarati': 'गुजराती',
-      'Punjabi': 'पंजाबी',
-      'Bengali': 'बांग्ला',
-      'Nepali': 'नेपाली',
-      'Ganesh Ji': 'गणेश जी',
-      'Navratri Stuti': 'नवरात्रि स्तुति',
-      'Raj Bhog': 'राज भोग',
-      'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
-      'My Stutis': 'मेरी स्तुतियाँ',
-      'By': 'द्वारा',
-      'page': 'पेज',
-      'pages': 'पेज'
-    };
-    
-    if (knownTranslations[text]) {
-      return knownTranslations[text];
-    }
+    if (KNOWN_TRANSLATIONS[text]) return KNOWN_TRANSLATIONS[text];
     
     // Try to translate using Google Translate (unofficial API)
     try {
@@ -231,33 +308,80 @@
 
   // Synchronous translation for display (uses cache or returns original)
   const translateDisplay = (text) => {
-    if (S.settings.uiLang === 'en') return text;
+    if (!text || typeof text !== 'string') return text;
     
-    const knownTranslations = {
-      'Stuti': 'स्तुति',
-      'Aarti': 'आरती',
-      'Chalisa': 'चालीसा',
-      'Bhajan': 'भजन',
-      'Mantra': 'मंत्र',
-      'Hindi': 'हिन्दी',
-      'Sanskrit': 'संस्कृत',
-      'English': 'अंग्रेजी',
-      'Marathi': 'मराठी',
-      'Gujarati': 'गुजराती',
-      'Punjabi': 'पंजाबी',
-      'Bengali': 'बांग्ला',
-      'Nepali': 'नेपाली',
-      'Ganesh Ji': 'गणेश जी',
-      'Navratri Stuti': 'नवरात्रि स्तुति',
-      'Raj Bhog': 'राज भोग',
-      'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
-      'My Stutis': 'मेरी स्तुतियाँ',
-      'By': 'द्वारा',
-      'page': 'पेज',
-      'pages': 'पेज'
-    };
+    const lang = S.settings.uiLang || 'en';
     
-    return knownTranslations[text] || text;
+    // 1. Bilingual split format: "English · Hindi"
+    if (text.includes(' · ')) {
+      const parts = text.split(' · ');
+      if (parts.length === 2) {
+        const hasDevanagari0 = /[ऀ-ॿ]/.test(parts[0]);
+        const hasDevanagari1 = /[ऀ-ॿ]/.test(parts[1]);
+        if (!hasDevanagari0 && hasDevanagari1) {
+          return lang === 'hi' ? parts[1].trim() : parts[0].trim();
+        } else if (hasDevanagari0 && !hasDevanagari1) {
+          return lang === 'hi' ? parts[0].trim() : parts[1].trim();
+        }
+      }
+    }
+    
+    // 2. Exact match in dictionary
+    if (KNOWN_TRANSLATIONS[text]) {
+      const trans = KNOWN_TRANSLATIONS[text];
+      const transIsHindi = /[ऀ-ॿ]/.test(trans);
+      if (lang === 'hi' && transIsHindi) return trans;
+      if (lang === 'en' && !transIsHindi) return trans;
+    }
+    
+    // If language matches text language, return as-is
+    const isHindi = /[ऀ-ॿ]/.test(text);
+    if (lang === 'hi' && isHindi) return text;
+    if (lang === 'en' && !isHindi) return text;
+    
+    // 3. For custom English to Hindi phrases
+    if (lang === 'hi' && !isHindi) {
+      const wordsToHindi = [
+        ['Cloud Community Library', 'क्लाउड कम्युनिटी लाइब्रेरी'],
+        ['Community Library', 'कम्युनिटी लाइब्रेरी'],
+        ['Navratri Stuti', 'नवरात्रि स्तुति'],
+        ['Ganesh Ji', 'गणेश जी'],
+        ['Raj Bhog', 'राज भोग'],
+        ['My Stutis', 'मेरी स्तुतियाँ'],
+        ['Chalisa', 'चालीसा'],
+        ['Bhajan', 'भजन'],
+        ['Mantra', 'मंत्र'],
+        ['Aarti', 'आरती'],
+        ['Stutis', 'स्तुतियाँ'],
+        ['Stuti', 'स्तुति'],
+        ['Ganesh', 'गणेश'],
+        ['Durga', 'दुर्गा'],
+        ['Shiva', 'शिव'],
+        ['Krishna', 'कृष्ण'],
+        ['Ram', 'राम'],
+        ['Hanuman', 'हनुमान'],
+        ['Navratri', 'नवरात्रि'],
+        ['Raj', 'राज'],
+        ['Bhog', 'भोग'],
+        ['Cloud', 'क्लाउड'],
+        ['My', 'मेरी'],
+        ['Ji', 'जी']
+      ];
+      
+      let result = text;
+      for (const [en, hi] of wordsToHindi) {
+        result = result.replace(new RegExp('\\b' + en + '\\b', 'gi'), hi);
+      }
+      return result;
+    }
+    
+    // 4. For Hindi to English custom transliteration
+    if (lang === 'en' && isHindi && window.Translit) {
+      const roman = window.Translit.transliterate(text, 'hi', 'standard');
+      return roman.replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    
+    return text;
   };
 
   const categoryName = (category) => {
@@ -616,7 +740,7 @@
         S.settings.uiLang = S.settings.uiLang === 'en' ? 'hi' : 'en';
         saveLocal();
         window.location.reload();
-      }, text: S.settings.uiLang === 'en' ? 'अ' : 'A' }));
+      }, text: S.settings.uiLang === 'en' ? 'अ' : 'A', title: S.settings.uiLang === 'en' ? 'Switch to Hindi (हिन्दी)' : 'Switch to English' }));
   }
 
   /* ---------- router ---------- */
@@ -649,8 +773,15 @@
     else if (path === '/read') viewRead(app, params);
     else if (path === '/settings') viewSettings(app);
     else viewHome(app);
+    const navTitles = {
+      '/': t('home'),
+      '/library': t('libraryTitle'),
+      '/add': t('add'),
+      '/settings': t('settingsTitle')
+    };
     document.querySelectorAll('#nav a').forEach((a) => {
       const r = a.dataset.route;
+      if (navTitles[r]) a.textContent = navTitles[r];
       a.classList.toggle('on', r === path || (r === '/add' && path.startsWith('/edit')) || (r === '/' && path === '/path'));
     });
     window.scrollTo(0, 0);
@@ -733,17 +864,17 @@
     function addStep(type, id) { S.path.push({ type, id }); saveLocal(); redraw(); }
     function renderAdd() {
       addBox.replaceChildren(h('h2', { text: t('addToSequence') }),
-        h('p', { class: 'muted', text: 'Pick from whole collections or single stutis.' }));
+        h('p', { class: 'muted', text: t('addToSequenceDesc') }));
       S.collections.forEach((c) => {
         const items = stutisIn(c.id);
         addBox.append(h('details', null,
           h('summary', null,
-            h('span', { class: 't', text: `${c.name} (${items.length})` }),
+            h('span', { class: 't', text: `${translateDisplay(c.name)} (${items.length})` }),
             h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
               onclick: (e) => { e.preventDefault(); e.stopPropagation(); addStep('collection', c.id); } })),
           items.length
             ? items.map((x) => h('div', { class: 'item' },
-              h('div', { class: 'name' }, h('b', { text: x.title }), h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
+              h('div', { class: 'name' }, h('b', { text: translateDisplay(x.title) }), h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
               h('button', { class: 'btn small', type: 'button', text: t('add'), onclick: () => addStep('stuti', x.id) })))
             : h('p', { class: 'muted', text: t('noStutis') })));
       });
@@ -834,8 +965,8 @@
       }
       const st = queue[qi], pg = st.pages[pi];
       const collections = collectionsOf(st);
-      titleEl.textContent = st.title;
-      subEl.textContent = `${collections.length ? collections.map((c) => c.name).join(', ') + ' · ' : ''}${t('stuti')} ${qi + 1} ${t('of')} ${queue.length}`;
+      titleEl.textContent = translateDisplay(st.title);
+      subEl.textContent = `${collections.length ? collections.map((c) => translateDisplay(c.name)).join(', ') + ' · ' : ''}${t('stuti')} ${qi + 1} ${t('of')} ${queue.length}`;
       pageLabel.textContent = `${t('pageLabel')} ${pi + 1}/${st.pages.length}`;
       const before = queue.slice(0, qi).reduce((a, s) => a + s.pages.length, 0) + pi + 1;
       fill.style.width = (before / total * 100) + '%';
@@ -884,7 +1015,7 @@
             S.customStutis.push(copy);
             S.stutis.push(copy);
             saveLocal();
-            toast('Copied to your library');
+            toast(t('copiedToLibrary'));
             draw();
           }})
         ];
@@ -920,7 +1051,7 @@
     const q = h('input', { type: 'search', placeholder: t('search') });
     const categoryFilter = h('select', {},
       h('option', { value: '', text: t('all') }),
-      CATEGORIES.map(([id, name]) => h('option', { value: id, text: name })));
+      CATEGORIES.map(([id]) => h('option', { value: id, text: categoryName(id) })));
     const list = h('div');
     
     // Create new collection dialog
@@ -1029,10 +1160,10 @@
         list.append(h('section', { class: 'card' },
           h('div', { class: 'row between' }, h('h3', { text: translateDisplay(c.name) }),
             (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
-              onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast('Added to your Sur'); } })),
+              onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast(t('addedToSur')); } })),
           items.length ? items.map(row) : h('p', { class: 'muted', text: t('noStutis') })));
       });
-      if (!list.children.length) list.append(h('p', { class: 'muted', text: term || category ? 'No matches.' : 'No collections yet.' }));
+      if (!list.children.length) list.append(h('p', { class: 'muted', text: term || category ? t('noMatches') : t('noCollectionsYet') }));
     }
     q.addEventListener('input', draw);
     categoryFilter.addEventListener('change', draw);
@@ -1080,12 +1211,12 @@
         authorIn.style.display = d.isPrivate ? 'none' : 'block';
       }
     },
-      h('option', { value: 'public', selected: !d.isPrivate, text: ' ' + t('public') + ' (Publish to Cloud for everyone)' }),
-      h('option', { value: 'private', selected: d.isPrivate, text: ' ' + t('private') + ' (Keep on this device only)' })
+      h('option', { value: 'public', selected: !d.isPrivate, text: t('publicOption') }),
+      h('option', { value: 'private', selected: d.isPrivate, text: t('privateOption') })
     );
 
     const catSel = h('select', { onchange: (e) => { d.category = e.target.value; } },
-      CATEGORIES.map(([c, n]) => h('option', { value: c, selected: c === d.category, text: n })));
+      CATEGORIES.map(([c]) => h('option', { value: c, selected: c === d.category, text: categoryName(c) })));
 
     const langSel = h('select', { onchange: (e) => { d.lang = e.target.value; } },
       LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === d.lang, text: `${n} · ${nat}` })));
@@ -1108,7 +1239,7 @@
             d.collectionId = nextIds;
           }
         });
-        return h('label', { class: 'row', style: 'margin:0 0 8px' }, checkbox, h('span', { text: `${c.name} (${stutisIn(c.id).length})` }));
+        return h('label', { class: 'row', style: 'margin:0 0 8px' }, checkbox, h('span', { text: `${translateDisplay(c.name)} (${stutisIn(c.id).length})` }));
       }));
       if (!collBox.children.length) collBox.append(h('p', { class: 'muted', text: 'Create a collection from the Library first.' }));
     }
@@ -1124,10 +1255,10 @@
         const img = h('img', { src: e.target.result, style: 'max-width:100%;max-height:400px;display:none' });
         const modal = h('div', { class: 'modal', style: 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:1000' },
           h('div', { style: 'background:#1a1a1a;padding:20px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto' },
-            h('h3', { text: 'Crop Image' }),
+            h('h3', { text: t('cropImage') }),
             img,
             h('div', { class: 'row', style: 'margin-top:10px' },
-              btn('Crop & Extract Text', async () => {
+              btn(t('cropExtract'), async () => {
                 if (cropper) {
                   const canvas = cropper.getCroppedCanvas();
                   const croppedDataUrl = canvas.toDataURL();
@@ -1190,14 +1321,14 @@
     function renderPages() {
       pagesBox.replaceChildren();
       d.pages.forEach((pg, i) => {
-        const textTa = h('textarea', { rows: 8, placeholder: 'Type page content…' });
+        const textTa = h('textarea', { rows: 8, placeholder: t('typePageContent') });
         textTa.value = pg.text;
         textTa.addEventListener('input', () => { 
           pg.text = textTa.value;
           updateTranslitPreview();
         });
         
-        const translitTa = h('textarea', { rows: 8, placeholder: 'English transliteration (auto-generated, editable)' });
+        const translitTa = h('textarea', { rows: 8, placeholder: t('englishTranslitPlaceholder') });
         translitTa.value = pg.translit || autoRoman(pg.text, d.lang);
         translitTa.addEventListener('input', () => { 
           pg.translit = translitTa.value;
@@ -1206,12 +1337,12 @@
         const card = h('div', { class: 'page-card' },
           h('b', { text: `${t('pageLabel')} ${i + 1}` }),
           h('div', { class: 'row' },
-            btn('Camera', () => camInput.click(), 'small ghost'),
-            btn('Upload Photo', () => fileInput.click(), 'small ghost')
+            btn(t('camera'), () => camInput.click(), 'small ghost'),
+            btn(t('uploadPhoto'), () => fileInput.click(), 'small ghost')
           ),
-          h('label', { text: t('original') + ' Text' }),
+          h('label', { text: t('original') + ' ' + t('textLabel') }),
           textTa,
-          h('label', { text: t('english') + ' (editable)' }),
+          h('label', { text: t('english') + ' (' + t('editable') + ')' }),
           translitTa
         );
         pagesBox.append(card);
@@ -1237,9 +1368,9 @@
       });
       
       const pages = d.pages.filter((p) => p.text.trim()).map((p) => ({ text: p.text.replace(/\s+$/, ''), translit: p.translit }));
-      if (!d.title.trim()) return toast('Please add a title');
-      if (!pages.length) return toast('Add at least one page');
-      if (!d.isPrivate && !d.authorName.trim()) return toast('Please enter your name for publishing');
+      if (!d.title.trim()) return toast(t('pleaseAddTitle'));
+      if (!pages.length) return toast(t('addAtLeastOnePage'));
+      if (!d.isPrivate && !d.authorName.trim()) return toast(t('pleaseEnterAuthor'));
       if (existing && !isLocallyEditable && !sudoMode) return toast('Admin mode is required to edit this stuti');
       if (!d.isPrivate) ensureCloudCollection();
 
@@ -1331,30 +1462,30 @@
     }, h('option', { value: 'dark', selected: S.settings.theme === 'dark', text: t('dark') }),
        h('option', { value: 'light', selected: S.settings.theme === 'light', text: t('light') }));
 
-    const passwordInput = h('input', { type: 'password', autocomplete: 'current-password', placeholder: t('settings') });
+    const passwordInput = h('input', { type: 'password', autocomplete: 'current-password', placeholder: t('adminPassword') });
     const adminStatus = h('p', {
       class: 'muted',
-      text: sudoMode ? 'Admin mode is unlocked for this tab.' : 'Enter the admin password to edit or delete any stuti.'
+      text: sudoMode ? t('adminUnlocked') : t('adminLocked')
     });
-    const adminButton = btn(sudoMode ? 'Lock admin mode' : 'Unlock admin mode', () => {
+    const adminButton = btn(sudoMode ? t('lockAdmin') : t('unlockAdmin'), () => {
       if (sudoMode) {
         sudoMode = false;
         passwordInput.value = '';
-        adminStatus.textContent = 'Admin mode is locked.';
-        adminButton.textContent = 'Unlock admin mode';
-        toast('Admin mode locked');
+        adminStatus.textContent = t('adminLocked');
+        adminButton.textContent = t('unlockAdmin');
+        toast(S.settings.uiLang === 'hi' ? 'व्यवस्थापक मोड लॉक किया गया' : 'Admin mode locked');
         return;
       }
       if (passwordInput.value !== ADMIN_PASSPHRASE) {
         passwordInput.value = '';
         passwordInput.focus();
-        return toast('Incorrect password');
+        return toast(S.settings.uiLang === 'hi' ? 'गलत पासवर्ड' : 'Incorrect password');
       }
       sudoMode = true;
       passwordInput.value = '';
-      adminStatus.textContent = 'Admin mode is unlocked for this tab.';
-      adminButton.textContent = 'Lock admin mode';
-      toast('Admin mode unlocked');
+      adminStatus.textContent = t('adminUnlocked');
+      adminButton.textContent = t('lockAdmin');
+      toast(S.settings.uiLang === 'hi' ? 'व्यवस्थापक मोड खुला' : 'Admin mode unlocked');
     }, 'primary');
     passwordInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') adminButton.click();
@@ -1364,14 +1495,19 @@
       renderLangToggle(),
       h('h1', { text: t('settingsTitle') }),
       h('section', { class: 'card' },
-        h('h2', { text: 'Appearance' }),
+        h('h2', { text: t('appearance') }),
         h('label', { text: t('theme') }), themeSel),
       h('section', { class: 'card' },
-        h('h2', { text: 'Admin mode' }),
+        h('h2', { text: t('adminMode') }),
         adminStatus,
-        h('label', { text: t('settings') }), passwordInput,
+        h('label', { text: t('adminPassword') }), passwordInput,
         h('div', { class: 'row', style: 'margin-top:12px' }, adminButton),
-        h('p', { class: 'muted', text: 'This passphrase is part of the app code and is not a secure authentication system.' }))));
+        h('p', { class: 'muted', text: t('adminNote') }))));
+  }
+
+  // Service worker registration for offline support
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
   // Initial immediate route render so app opens with zero delay, then init cloud

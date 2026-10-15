@@ -1,5 +1,5 @@
 /* Sur service worker: network first, falls back to cache so the app opens offline. */
-const CACHE = 'sur-v1';
+const CACHE = 'sur-v2';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'translit.js', 'seed.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
