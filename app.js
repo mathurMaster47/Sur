@@ -457,7 +457,7 @@
           const info = stepInfo(st);
           if (!info) return;
           ol.append(h('li', null,
-            h('div', { class: 'name' }, h('b', { text: info.name }), h('span', { class: 'muted', text: info.sub })),
+            h('div', { class: 'name' }, h('b', { text: info.name }), h('span', { class: 'muted', text: info.sub || '' })),
             h('button', { class: 'btn small', type: 'button', text: '▲', disabled: i === 0, onclick: () => move(i, -1) }),
             h('button', { class: 'btn small', type: 'button', text: '▼', disabled: i === S.path.length - 1, onclick: () => move(i, 1) }),
             h('button', { class: 'btn small danger', type: 'button', text: '✕', onclick: () => { S.path.splice(i, 1); saveLocal(); redraw(); } })));
