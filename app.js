@@ -22,6 +22,141 @@
   const categoryName = (category) => (CATEGORIES.find(([id]) => id === category) || [category, category])[1];
   const ADMIN_PASSPHRASE = 'pspspspsps';
 
+  const UI_LANGS = [
+    ['en', 'English', 'English'],
+    ['hi', 'Hindi', 'हिन्दी']
+  ];
+
+  const TRANSLATIONS = {
+    en: {
+      start: 'Start',
+      done: 'Done',
+      read: 'Read',
+      edit: 'Edit',
+      library: 'Library',
+      add: 'Add',
+      yourSur: 'Your Sur',
+      yourPrayers: 'Your prayers, in your order.',
+      yourSequence: 'Your sequence',
+      addToSequence: 'Add to your sequence',
+      nothingYet: 'Nothing yet. Add items below.',
+      writeNew: 'Write a new stuti',
+      buildSur: 'Build your Sur',
+      editSur: 'Edit your Sur',
+      selectRead: 'Select what to read',
+      quickRead: 'Quick Read',
+      quickReadDesc: 'Choose a single stuti to read right now.',
+      nothingToRead: 'Nothing to read yet',
+      completed: 'Completed',
+      startAgain: 'Start again',
+      chooseAnother: 'Choose another',
+      search: 'Search...',
+      all: 'All',
+      collections: 'Collections',
+      noStutis: 'No stutis here yet.',
+      language: 'Language',
+      category: 'Category',
+      deity: 'Deity',
+      title: 'Title',
+      private: 'Private',
+      public: 'Public',
+      publisherName: 'Publisher name',
+      save: 'Save',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      copy: 'Copy',
+      shareLink: 'Share Link',
+      exportJSON: 'Export JSON',
+      importJSON: 'Import JSON',
+      close: 'Close',
+      back: 'Back',
+      next: 'Next',
+      addPage: '+ Add page',
+      removePage: 'Remove page',
+      original: 'Original',
+      english: 'English',
+      both: 'Both',
+      dark: 'Dark',
+      light: 'Light',
+      settings: 'Settings',
+      createCollection: '+ Collection',
+      enterCollectionName: 'Enter collection name',
+      wholeCollection: '+ Whole collection',
+      wholeCollectionDesc: 'Whole collection · {} stutis',
+      pages: 'page',
+      pages_plural: 'pages',
+      by: 'By',
+      deleteConfirm: 'Delete this stuti?',
+      addFirst: 'Add something first'
+    },
+    hi: {
+      start: 'शुरू',
+      done: 'हो गया',
+      read: 'पढ़ें',
+      edit: 'संपादित करें',
+      library: 'लाइब्रेरी',
+      add: 'जोड़ें',
+      yourSur: 'आपका सुर',
+      yourPrayers: 'आपकी प्रार्थनाएं, आपके क्रम में।',
+      yourSequence: 'आपका क्रम',
+      addToSequence: 'अपने क्रम में जोड़ें',
+      nothingYet: 'अभी कुछ नहीं। नीचे से आइटम जोड़ें।',
+      writeNew: '+ नई स्तुति लिखें',
+      buildSur: 'अपना सुर बनाएं',
+      editSur: 'अपना सुर संपादित करें',
+      selectRead: 'पढ़ने के लिए चुनें',
+      quickRead: 'तुरंत पढ़ें',
+      quickReadDesc: 'अभी एक स्तुति चुनकर पढ़ें।',
+      nothingToRead: 'पढ़ने के लिए कुछ नहीं',
+      completed: 'पूर्ण हो गया',
+      startAgain: 'फिर से शुरू करें',
+      chooseAnother: 'दूसरा चुनें',
+      search: 'खोजें...',
+      all: 'सभी',
+      collections: 'संग्रह',
+      noStutis: 'यहां अभी कोई स्तुति नहीं है।',
+      language: 'भाषा',
+      category: 'श्रेणी',
+      deity: 'देवता',
+      title: 'शीर्षक',
+      private: 'निजी',
+      public: 'सार्वजनिक',
+      publisherName: 'प्रकाशक का नाम',
+      save: 'सहेजें',
+      cancel: 'रद्द करें',
+      delete: 'हटाएं',
+      copy: 'कॉपी',
+      shareLink: 'लिंक साझा करें',
+      exportJSON: 'JSON निर्यात',
+      importJSON: 'JSON आयात',
+      close: 'बंद करें',
+      back: 'पीछे',
+      next: 'आगे',
+      addPage: '+ पेज जोड़ें',
+      removePage: 'पेज हटाएं',
+      original: 'मूल',
+      english: 'अंग्रेजी',
+      both: 'दोनों',
+      dark: 'अंधेरा',
+      light: 'रोशनी',
+      settings: 'सेटिंग्स',
+      createCollection: '+ संग्रह',
+      enterCollectionName: 'संग्रह का नाम दर्ज करें',
+      wholeCollection: '+ पूरा संग्रह',
+      wholeCollectionDesc: 'पूरा संग्रह · {} स्तुतियाँ',
+      pages: 'पेज',
+      pages_plural: 'पेज',
+      by: 'द्वारा',
+      deleteConfirm: 'इस स्तुति को हटाएं?',
+      addFirst: 'पहले कुछ जोड़ें'
+    }
+  };
+
+  const t = (key) => {
+    const lang = S.settings.uiLang || 'en';
+    return TRANSLATIONS[lang][key] || TRANSLATIONS.en[key] || key;
+  };
+
   /* ---------- helpers ---------- */
   const $ = (sel, root) => (root || document).querySelector(sel);
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -63,7 +198,7 @@
     const seed = clone(window.SUR_SEED || { collections: [], stutis: [] });
     return {
       v: 1, collections: seed.collections, stutis: seed.stutis, customStutis: [], deletedSeedIds: [], path: [], pos: null,
-      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard' }
+      settings: { view: 'both', size: 24, theme: 'dark', style: 'standard', uiLang: 'en' }
     };
   }
 
@@ -419,25 +554,33 @@
     const q = buildQueue();
     const pages = q.reduce((a, s) => a + s.pages.length, 0);
     const hasPos = S.pos && q.some((x) => x.id === S.pos.sid);
+    
+    const langToggle = h('select', { class: 'btn small ghost', onchange: (e) => {
+      S.settings.uiLang = e.target.value;
+      saveLocal();
+      window.location.reload();
+    } }, UI_LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === (S.settings.uiLang || 'en'), text: nat })));
+    
     app.append(h('div', { class: 'screen' },
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
-        h('p', { class: 'muted', text: 'Your prayers, in your order.' })),
+        h('p', { class: 'muted', text: t('yourPrayers') })),
       h('section', { class: 'card' },
-        h('h2', { text: 'Your Sur' }),
+        h('h2', { text: t('yourSur') }),
         h('ol', { class: 'steps' }, S.path.map((st) => {
           const i = stepInfo(st);
           return i ? h('li', null, h('div', { class: 'name' }, h('b', { text: i.name }), h('span', { class: 'muted', text: i.sub || '' }))) : null;
         })),
         h('p', { class: 'muted', text: `${q.length} stutis · ${pages} pages` }),
         h('div', { class: 'row' },
-          link('Start', '#/read', 'primary'),
+          link(t('start'), '#/read', 'primary'),
           hasPos ? link('Continue', '#/read?resume=1') : null,
-          link('Edit', '#/path', 'ghost'))),
+          link(t('edit'), '#/path', 'ghost'))),
       h('section', { class: 'card' },
-        h('h2', { text: 'Quick Read' }),
-        h('p', { class: 'muted', text: 'Choose a single stuti to read right now.' }),
-        link('Select what to read', '#/select', 'primary'))));
+        h('h2', { text: t('quickRead') }),
+        h('p', { class: 'muted', text: t('quickReadDesc') }),
+        link(t('selectRead'), '#/select', 'primary')),
+      h('div', { class: 'row', style: 'justify-content:center; margin-top:20px' }, langToggle)));
   }
 
   /* ---------- Path builder ---------- */
@@ -446,11 +589,17 @@
     const addBox = h('section', { class: 'card' });
     const startRow = h('div', { class: 'row' });
 
+    const langToggle = h('select', { class: 'btn small ghost', onchange: (e) => {
+      S.settings.uiLang = e.target.value;
+      saveLocal();
+      window.location.reload();
+    } }, UI_LANGS.map(([c, n, nat]) => h('option', { value: c, selected: c === (S.settings.uiLang || 'en'), text: nat })));
+
     function renderSeq() {
-      seqBox.replaceChildren(h('h2', { text: 'Your sequence' }));
+      seqBox.replaceChildren(h('h2', { text: t('yourSequence') }));
       cleanPath();
       if (!S.path.length) {
-        seqBox.append(h('p', { class: 'muted', text: 'Nothing yet. Add items below.' }));
+        seqBox.append(h('p', { class: 'muted', text: t('nothingYet') }));
       } else {
         const ol = h('ol', { class: 'steps' });
         S.path.forEach((st, i) => {
@@ -465,7 +614,7 @@
         seqBox.append(ol);
       }
       startRow.replaceChildren(
-        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, text: 'Start', onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast('Add something first'); } } }));
+        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, text: t('start'), onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast(t('addFirst')); } } }));
     }
     function move(i, d) {
       const j = i + d;
@@ -475,22 +624,22 @@
     }
     function addStep(type, id) { S.path.push({ type, id }); saveLocal(); redraw(); }
     function renderAdd() {
-      addBox.replaceChildren(h('h2', { text: 'Add to your sequence' }),
+      addBox.replaceChildren(h('h2', { text: t('addToSequence') }),
         h('p', { class: 'muted', text: 'Pick from whole collections or single stutis.' }));
       S.collections.forEach((c) => {
         const items = stutisIn(c.id);
         addBox.append(h('details', null,
           h('summary', null,
             h('span', { class: 't', text: `${c.name} (${items.length})` }),
-            h('button', { class: 'btn small', type: 'button', text: '+ Whole collection', disabled: !items.length,
+            h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
               onclick: (e) => { e.preventDefault(); e.stopPropagation(); addStep('collection', c.id); } })),
           items.length
             ? items.map((x) => h('div', { class: 'item' },
               h('div', { class: 'name' }, h('b', { text: x.title }), h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.pages.length} page${x.pages.length > 1 ? 's' : ''}` })),
-              h('button', { class: 'btn small', type: 'button', text: '+ Add', onclick: () => addStep('stuti', x.id) })))
-            : h('p', { class: 'muted', text: 'No stutis here yet.' })));
+              h('button', { class: 'btn small', type: 'button', text: t('add'), onclick: () => addStep('stuti', x.id) })))
+            : h('p', { class: 'muted', text: t('noStutis') })));
       });
-      addBox.append(h('div', { class: 'row', style: 'margin-top:10px' }, link('+ Write a new stuti', '#/add', 'small ghost')));
+      addBox.append(h('div', { class: 'row', style: 'margin-top:10px' }, link(t('writeNew'), '#/add', 'small ghost')));
     }
     function redraw() {
       const open = [...addBox.querySelectorAll('details')].map((d) => d.open);
@@ -500,8 +649,8 @@
 
     app.append(h('div', { class: 'screen' },
       welcome ? h('div', { class: 'hero' }, h('div', { class: 'logo', text: 'सुर' })) : null,
-      h('h1', { text: welcome ? 'Build your Sur' : 'Edit your Sur' }),
-      seqBox, startRow, addBox));
+      h('h1', { text: welcome ? t('buildSur') : t('editSur') }),
+      seqBox, startRow, addBox, h('div', { class: 'row', style: 'justify-content:center; margin-top:20px' }, langToggle)));
     renderSeq(); renderAdd();
   }
 
