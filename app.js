@@ -427,7 +427,7 @@
         h('h2', { text: 'Your Sur' }),
         h('ol', { class: 'steps' }, S.path.map((st) => {
           const i = stepInfo(st);
-          return i ? h('li', null, h('div', { class: 'name' }, h('b', { text: i.name }), h('span', { class: 'muted', text: i.sub }))) : null;
+          return i ? h('li', null, h('div', { class: 'name' }, h('b', { text: i.name }), h('span', { class: 'muted', text: i.sub || '' }))) : null;
         })),
         h('p', { class: 'muted', text: `${q.length} stutis · ${pages} pages` }),
         h('div', { class: 'row' },
