@@ -465,8 +465,7 @@
         seqBox.append(ol);
       }
       startRow.replaceChildren(
-        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, text: 'Start', onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast('Add something first'); } } }),
-        S.path.length ? link('Done', '#/', 'ghost') : null);
+        h('a', { class: 'btn primary', href: S.path.length ? '#/read' : null, text: 'Start', onclick: (e) => { if (!S.path.length) { e.preventDefault(); toast('Add something first'); } } })));
     }
     function move(i, d) {
       const j = i + d;
