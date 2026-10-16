@@ -5,7 +5,7 @@
   'use strict';
 
   /* ---------- constants ---------- */
-  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz87a8_r-1bFZLQLLfkcg2fDDr0fqwsF3OT-uQa6rvX9jftReBvpxIhwmnZnnhHW__C/exec';
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzcJxJdTf5YpM4p-Evf-kO8EBNqTp_vFfR8DTMc23D7K0ny-LgHn4Q2aS4p1ev6XSlm/exec';
 
   const KEY = 'sur.v1';
   // App release version. Shown in the footer of the Settings page.
