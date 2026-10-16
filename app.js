@@ -10,7 +10,7 @@
   const KEY = 'sur.v1';
   // App release version. Shown in the footer of the Settings page.
   // On each release, bump this AND the CACHE name in sw.js so users get fresh assets.
-  const APP_VERSION = '3';
+  const APP_VERSION = '4';
   const CLOUD_COLLECTION_ID = 'cloud-collection';
   const RETIRED_SAMPLE_IDS = new Set(['s-ganesh-1', 's-navratri-1', 's-rajbhog-1', 's-aarti-1']);
   const LANGS = [
@@ -126,7 +126,11 @@
       copiedToLibrary: 'Copied to your library',
       pleaseAddTitle: 'Please add a title',
       addAtLeastOnePage: 'Add at least one page',
-      pleaseEnterAuthor: 'Please enter your name for publishing'
+      pleaseEnterAuthor: 'Please enter your name for publishing',
+      update: 'Update',
+      updatingCloud: 'Updating Cloud Community...',
+      cloudUpdated: 'Cloud Community stutis updated!',
+      cloudUpdateFailed: 'Failed to update Cloud Community'
     },
     hi: {
       start: 'शुरू',
@@ -224,7 +228,11 @@
       copiedToLibrary: 'आपकी लाइब्रेरी में कॉपी किया गया',
       pleaseAddTitle: 'कृपया एक शीर्षक दर्ज करें',
       addAtLeastOnePage: 'कम से कम एक पेज जोड़ें',
-      pleaseEnterAuthor: 'प्रकाशन के लिए अपना नाम दर्ज करें'
+      pleaseEnterAuthor: 'प्रकाशन के लिए अपना नाम दर्ज करें',
+      update: 'अपडेट',
+      updatingCloud: 'क्लाउड कम्युनिटी अपडेट हो रही है...',
+      cloudUpdated: 'क्लाउड कम्युनिटी स्तुतियाँ अपडेट हुईं!',
+      cloudUpdateFailed: 'क्लाउड कम्युनिटी अपडेट करने में विफल'
     }
   };
 
@@ -257,6 +265,7 @@
     'Navratri Stuti': 'नवरात्रि स्तुति',
     'Raj Bhog': 'राज भोग',
     'Cloud Community Library': 'क्लाउड कम्युनिटी लाइब्रेरी',
+    'Update': 'अपडेट',
     'My Stutis': 'मेरी स्तुतियाँ',
     'By': 'द्वारा',
     'page': 'पेज',
@@ -285,6 +294,7 @@
     'नवरात्रि स्तुति': 'Navratri Stuti',
     'राज भोग': 'Raj Bhog',
     'क्लाउड कम्युनिटी लाइब्रेरी': 'Cloud Community Library',
+    'अपडेट': 'Update',
     'मेरी स्तुतियाँ': 'My Stutis',
     'द्वारा': 'By',
     'पेज': 'page'
@@ -543,7 +553,11 @@
   }
 
   /* ---------- cloud & share handling ---------- */
-  async function fetchCloudStutis() {
+  let isFetchingCloud = false;
+  async function fetchCloudStutis(showFeedback = false) {
+    if (isFetchingCloud) return false;
+    isFetchingCloud = true;
+    if (showFeedback) toast(t('updatingCloud'));
     try {
       ensureCloudCollection();
       let migratedPublicStutis = false;
@@ -559,7 +573,10 @@
       const response = await fetch(GOOGLE_SCRIPT_URL);
       const data = await response.json();
       
-      if (!data || !Array.isArray(data)) return;
+      if (!data || !Array.isArray(data)) {
+        if (showFeedback) toast(t('cloudUpdateFailed'));
+        return false;
+      }
       
       const cloudStutis = [];
       for (const row of data) {
@@ -593,22 +610,30 @@
       }
 
       // Merge all stutis: seed + custom + cloud
-      // Custom stutis take precedence over cloud stutis with same ID
+      // Latest cloud rows populate the cloud community collection
       const map = new Map();
       (window.SUR_SEED?.stutis || []).forEach(s => map.set(s.id, s));
       S.customStutis.forEach(s => map.set(s.id, s));
       cloudStutis.forEach(s => {
-        // Keep local edits authoritative; otherwise later cloud rows replace older copies.
-        if (!S.customStutis.some((custom) => custom.id === s.id)) {
-          map.set(s.id, s);
+        const local = S.customStutis.find(c => c.id === s.id);
+        if (local && local.collectionId) {
+          s.collectionId = [...new Set([...ensureArray(local.collectionId), CLOUD_COLLECTION_ID])];
         }
+        map.set(s.id, s);
       });
 
       S.stutis = Array.from(map.values());
       cleanPath();
+      saveLocal();
       route();
+      if (showFeedback) toast(t('cloudUpdated'));
+      return true;
     } catch(e) {
       console.error('Fetch cloud error:', e);
+      if (showFeedback) toast(t('cloudUpdateFailed'));
+      return false;
+    } finally {
+      isFetchingCloud = false;
     }
   }
 
@@ -821,8 +846,10 @@
       libraryBox.replaceChildren(
         h('div', { class: 'row between' },
           h('h2', { text: t('libraryTitle') }),
-          h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
-            onclick: () => addStep('collection', CLOUD_COLLECTION_ID) })));
+          h('div', { class: 'row' },
+            btn('⟳ ' + t('update'), () => fetchCloudStutis(true), 'small'),
+            h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
+              onclick: () => addStep('collection', CLOUD_COLLECTION_ID) }))));
       if (!items.length) {
         libraryBox.append(h('p', { class: 'muted', text: t('noStutis') }));
         return;
@@ -1202,10 +1229,13 @@
         if (category) items = items.filter((s) => (s.category || 'stuti') === category);
         if (term) items = items.filter((s) => (s.title + ' ' + s.deity + ' ' + categoryName(s.category || 'stuti') + ' ' + s.pages.map((p) => p.text).join(' ')).toLowerCase().includes(term));
         if ((term || category) && !items.length) return;
+        const isCloud = c.id === CLOUD_COLLECTION_ID;
+        const headerButtons = (term || category) ? null : h('div', { class: 'row' },
+          isCloud ? btn('⟳ ' + t('update'), () => fetchCloudStutis(true), 'small') : null,
+          h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
+            onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast(t('addedToSur')); } }));
         list.append(h('section', { class: 'card' },
-          h('div', { class: 'row between' }, h('h3', { text: translateDisplay(c.name) }),
-            (term || category) ? null : h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
-              onclick: () => { S.path.push({ type: 'collection', id: c.id }); saveLocal(); toast(t('addedToSur')); } })),
+          h('div', { class: 'row between' }, h('h3', { text: translateDisplay(c.name) }), headerButtons),
           items.length ? items.map(row) : h('p', { class: 'muted', text: t('noStutis') })));
       });
       if (!list.children.length) list.append(h('p', { class: 'muted', text: term || category ? t('noMatches') : t('noCollectionsYet') }));
