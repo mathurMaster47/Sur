@@ -1,5 +1,6 @@
 /* Sur service worker: network first, falls back to cache so the app opens offline. */
-const CACHE = 'sur-v2';
+// Keep this version in sync with APP_VERSION in app.js. Bump on each release.
+const CACHE = 'sur-v3';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'translit.js', 'seed.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', (e) => {

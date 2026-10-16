@@ -8,6 +8,9 @@
   const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz87a8_r-1bFZLQLLfkcg2fDDr0fqwsF3OT-uQa6rvX9jftReBvpxIhwmnZnnhHW__C/exec';
 
   const KEY = 'sur.v1';
+  // App release version. Shown in the footer of the Settings page.
+  // On each release, bump this AND the CACHE name in sw.js so users get fresh assets.
+  const APP_VERSION = '3';
   const CLOUD_COLLECTION_ID = 'cloud-collection';
   const RETIRED_SAMPLE_IDS = new Set(['s-ganesh-1', 's-navratri-1', 's-rajbhog-1', 's-aarti-1']);
   const LANGS = [
@@ -801,31 +804,73 @@
   }
 
   function viewHome(app) {
-    if (!S.path.length) return viewPath(app, true);
-    const q = buildQueue();
-    const pages = q.reduce((a, s) => a + s.pages.length, 0);
-    const hasPos = S.pos && q.some((x) => x.id === S.pos.sid);
-    
+    const libraryBox = h('section', { class: 'card' });
+    const seqBox = h('section', { class: 'card' });
+
+    function addStep(type, id) { S.path.push({ type, id }); saveLocal(); renderSeq(); toast(t('addedToSur')); }
+    function move(i, d) {
+      const j = i + d;
+      if (j < 0 || j >= S.path.length) return;
+      [S.path[i], S.path[j]] = [S.path[j], S.path[i]];
+      saveLocal(); renderSeq();
+    }
+
+    function renderLibrary() {
+      ensureCloudCollection();
+      const items = stutisIn(CLOUD_COLLECTION_ID);
+      libraryBox.replaceChildren(
+        h('div', { class: 'row between' },
+          h('h2', { text: t('libraryTitle') }),
+          h('button', { class: 'btn small', type: 'button', text: t('wholeCollection'), disabled: !items.length,
+            onclick: () => addStep('collection', CLOUD_COLLECTION_ID) })));
+      if (!items.length) {
+        libraryBox.append(h('p', { class: 'muted', text: t('noStutis') }));
+        return;
+      }
+      items.forEach((x) => {
+        libraryBox.append(h('div', { class: 'item' },
+          h('div', { class: 'name' },
+            h('b', { text: translateDisplay(x.title) }),
+            h('span', { class: 'muted', text: `${langName(x.lang)} · ${x.pages.length} ${x.pages.length === 1 ? t('pages') : t('pages_plural')}` })),
+          h('button', { class: 'btn small', type: 'button', text: t('add'), onclick: () => addStep('stuti', x.id) })));
+      });
+    }
+
+    function renderSeq() {
+      cleanPath();
+      const q = buildQueue();
+      const pages = q.reduce((a, s) => a + s.pages.length, 0);
+      const hasPos = S.pos && q.some((x) => x.id === S.pos.sid);
+      seqBox.replaceChildren(h('h2', { text: t('buildSur') }));
+      if (!S.path.length) {
+        seqBox.append(h('p', { class: 'muted', text: t('nothingYet') }));
+        return;
+      }
+      const ol = h('ol', { class: 'steps' });
+      S.path.forEach((st, i) => {
+        const info = stepInfo(st);
+        if (!info) return;
+        ol.append(h('li', null,
+          h('div', { class: 'name' }, h('b', { text: info.name }), h('span', { class: 'muted', text: info.sub || '' })),
+          h('button', { class: 'btn small', type: 'button', text: '▲', disabled: i === 0, onclick: () => move(i, -1) }),
+          h('button', { class: 'btn small', type: 'button', text: '▼', disabled: i === S.path.length - 1, onclick: () => move(i, 1) }),
+          h('button', { class: 'btn small danger', type: 'button', text: '✕', onclick: () => { S.path.splice(i, 1); saveLocal(); renderSeq(); } })));
+      });
+      seqBox.append(ol,
+        h('p', { class: 'muted', text: `${q.length} ${t('stuti')} · ${pages} ${pages === 1 ? t('pages') : t('pages_plural')}` }),
+        h('div', { class: 'row' },
+          link(t('start'), '#/read', 'primary'),
+          hasPos ? link(t('resume'), '#/read?resume=1') : null,
+          link(t('edit'), '#/path', 'ghost')));
+    }
+
     app.append(h('div', { class: 'screen' },
       renderLangToggle(),
       h('div', { class: 'hero' },
         h('div', { class: 'logo', text: 'सुर' }),
         h('p', { class: 'muted', text: t('yourPrayers') })),
-      h('section', { class: 'card' },
-        h('h2', { text: t('yourSur') }),
-        h('ol', { class: 'steps' }, S.path.map((st) => {
-          const i = stepInfo(st);
-          return i ? h('li', null, h('div', { class: 'name' }, h('b', { text: i.name }), h('span', { class: 'muted', text: i.sub || '' }))) : null;
-        })),
-        h('p', { class: 'muted', text: `${q.length} ${t('stuti')} · ${pages} ${pages === 1 ? t('pages') : t('pages_plural')}` }),
-        h('div', { class: 'row' },
-          link(t('start'), '#/read', 'primary'),
-          hasPos ? link(t('resume'), '#/read?resume=1') : null,
-          link(t('edit'), '#/path', 'ghost'))),
-      h('section', { class: 'card' },
-        h('h2', { text: t('quickRead') }),
-        h('p', { class: 'muted', text: t('quickReadDesc') }),
-        link(t('selectRead'), '#/select', 'primary'))));
+      libraryBox, seqBox));
+    renderLibrary(); renderSeq();
   }
 
   /* ---------- Path builder ---------- */
@@ -1502,11 +1547,20 @@
         adminStatus,
         h('label', { text: t('adminPassword') }), passwordInput,
         h('div', { class: 'row', style: 'margin-top:12px' }, adminButton),
-        h('p', { class: 'muted', text: t('adminNote') }))));
+        h('p', { class: 'muted', text: t('adminNote') })),
+      h('p', { class: 'muted', style: 'text-align:center;margin-top:18px', text: 'Sur v' + APP_VERSION })));
   }
 
-  // Service worker registration for offline support
+  // Service worker registration for offline support.
+  // When a new worker takes control (e.g. after a cache-name bump in sw.js),
+  // reload once so open tabs pick up the new assets instead of the old cached ones.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    let reloadedForNewWorker = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloadedForNewWorker) return;
+      reloadedForNewWorker = true;
+      window.location.reload();
+    });
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
